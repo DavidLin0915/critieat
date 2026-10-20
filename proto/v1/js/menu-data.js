@@ -1,11 +1,16 @@
 (function (CE) {
   'use strict';
   // 菜單資料：讀寫、品項 ID、比對、搜尋。不碰 DOM。
-  // 使用者存的菜單放 localStorage（critieat.menus.v1，{ [storeId]: Menu }），沒有就用 CE.DEMO_MENUS。之後換成 API。
+  // 正式版（live）：Supabase menus 表，ready() 時一次載入記憶體；照片上傳到 Storage 的 menu-photos。
+  // 示範模式：使用者存的菜單放 localStorage（critieat.menus.v1，{ [storeId]: Menu }），沒有就用 CE.DEMO_MENUS。
   // Menu: { updatedAt, updatedBy, sections: [{ name, items: [{ id, name, price, note }] }], photos? }
   // 品項 ID 同一家店內唯一；重新上傳時「品名＋備註」相同的品項沿用舊 ID（品項評分、點餐連結才不會斷）。
 
   const KEY = 'critieat.menus.v1';
+  const BUCKET = 'menu-photos';
+  const live = () => !CE.isDemo();
+  let liveMenus = {};   // live：{ [storeId]: Menu }
+  let photoSeq = 0;
 
   // ── 比對用的正規化：全形英數符號與全形空白轉半形、去前後空白、英文轉小寫 ──
   function norm(v) {
@@ -26,6 +31,7 @@
   let cache = null;
 
   function loadSaved() {
+    if (live()) return liveMenus;
     if (cache) return cache;
     let map = {};
     try {
@@ -79,7 +85,7 @@
     const m = map[storeId];
     if (!isValidMenu(m)) return null;
     const r = ensureIds(m, storeId);
-    if (r.changed) writeSaved(Object.assign({}, map, { [storeId]: r.menu }));
+    if (r.changed && !live()) writeSaved(Object.assign({}, map, { [storeId]: r.menu }));
     return r.menu;
   }
 
@@ -87,18 +93,53 @@
     return !!savedMenu(storeId);
   }
 
+  // 示範菜單只在示範模式出現
+  const demoMenu = storeId => (!live() && CE.DEMO_MENUS && CE.DEMO_MENUS[storeId]) || null;
+
   // 回傳複製品：外面改了不會汙染快取
   function getMenu(storeId) {
-    const m = savedMenu(storeId) || (CE.DEMO_MENUS && CE.DEMO_MENUS[storeId]) || null;
+    const m = savedMenu(storeId) || demoMenu(storeId);
     return m && JSON.parse(JSON.stringify(m));
   }
 
   function hasMenu(storeId) {
-    return !!(savedMenu(storeId) || (CE.DEMO_MENUS && CE.DEMO_MENUS[storeId]));
+    return !!(savedMenu(storeId) || demoMenu(storeId));
   }
 
-  function saveMenu(storeId, menu) {
-    return writeSaved(Object.assign({}, loadSaved(), { [storeId]: menu }));
+  const fromRow = r => ({ updatedAt: String(r.updated_at || ''), updatedBy: r.updated_by || '', sections: r.sections || [], photos: r.photos || [] });
+
+  async function ready() {
+    if (!live()) return true;
+    try {
+      const rows = await CE.supa.select('menus', 'select=*');
+      liveMenus = Object.fromEntries(rows.map(r => [r.store_id, fromRow(r)]));
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // 回傳 Promise<boolean>；正式版寫入成功才更新記憶體
+  async function saveMenu(storeId, menu) {
+    if (!live()) return writeSaved(Object.assign({}, loadSaved(), { [storeId]: menu }));
+    const row = { store_id: storeId, sections: menu.sections, photos: menu.photos || [], updated_by: menu.updatedBy, updated_at: menu.updatedAt };
+    try {
+      await CE.supa.upsert('menus', row, 'store_id');
+    } catch (e) {
+      return false;
+    }
+    liveMenus = Object.assign({}, liveMenus, { [storeId]: JSON.parse(JSON.stringify(menu)) });
+    return true;
+  }
+
+  // 正式版：上傳一張已縮好的 JPEG，回傳公開網址；失敗回傳 null
+  async function uploadPhoto(storeId, blob) {
+    photoSeq += 1;
+    try {
+      return await CE.supa.upload(BUCKET, `${storeId}/${Date.now()}-${photoSeq}.jpg`, blob, 'image/jpeg');
+    } catch (e) {
+      return null;
+    }
   }
 
   function removeSaved(storeId) {
@@ -134,7 +175,7 @@
 
   // ── 查詢 ──
   function items(storeId) {
-    const menu = savedMenu(storeId) || (CE.DEMO_MENUS && CE.DEMO_MENUS[storeId]) || null;
+    const menu = savedMenu(storeId) || demoMenu(storeId);
     if (!menu) return [];
     return menu.sections.flatMap(sec => sec.items.map(it => ({
       id: it.id, name: it.name, price: it.price == null ? null : it.price, note: it.note || '', category: sec.name,
@@ -167,7 +208,7 @@
   }
 
   CE.menuData = {
-    KEY, norm, itemKey, isSaved, getMenu, hasMenu, saveMenu, removeSaved,
+    KEY, norm, itemKey, isSaved, getMenu, hasMenu, ready, saveMenu, uploadPhoto, removeSaved,
     assignIds, ensureIds, items, findItem, matchItem, search,
   };
 })(globalThis.CE = globalThis.CE || {});

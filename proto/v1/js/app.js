@@ -257,11 +257,11 @@
     document.getElementById('pick-btn').addEventListener('click', openPicker);
     renderHeader();
 
-    // 正式版先從 Supabase 載入店家與同事名單；地圖同時開始載入
+    // 正式版先從 Supabase 載入店家、同事名單與菜單；地圖同時開始載入
     state.loading = true;
     renderList();
     const mapReady = CE.loadMap(CE.CONFIG.googleMapsKey, document.getElementById('map'), id => select(id, 'map'));
-    await Promise.all([CE.storeRepo.ready(), CE.memberRepo.ready()]);
+    await Promise.all([CE.storeRepo.ready(), CE.memberRepo.ready(), CE.menuData.ready()]);
     state.loading = false;
     state.all = CE.buildViewModel(CE.storeRepo.visible(), state.settings, state.dayKey);
 

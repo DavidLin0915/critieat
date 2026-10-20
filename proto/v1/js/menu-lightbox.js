@@ -1,6 +1,7 @@
 (function (CE) {
   'use strict';
   // 菜單燈箱：結構化表格 + 原始照片對照，以及「上傳 → AI 辨識 → 確認草稿 → 儲存」流程（原型：辨識是假的）。
+  // 正式版沒有 AI 辨識：「上傳照片 → 對照照片手動輸入品項 → 儲存」，照片上傳到 Supabase Storage。
   // 資料：讀寫交給 menu-data.js（CE.menuData）。
   // 用法：CE.hasMenu(storeId)、CE.openMenu({ id, name, category })
   // 儲存或還原後在 document 發出 'ce:menu-change'，頁面可藉此更新按鈕文字。
@@ -50,8 +51,8 @@
     document.dispatchEvent(new CustomEvent('ce:menu-change', { detail: { storeId } }));
   }
 
-  // 上傳的照片縮到長邊 1200px 的 JPEG data URL，才放得進 localStorage；讀不了回傳 null
-  function shrink(src) {
+  // 上傳的照片縮到長邊 1200px 的 JPEG：示範模式要 data URL（放進 localStorage），正式版要 Blob（上傳）；讀不了回傳 null
+  function shrink(src, asBlob) {
     return new Promise(resolve => {
       const img = new Image();
       img.onload = () => {
@@ -60,7 +61,8 @@
         c.width = Math.round(img.naturalWidth * k);
         c.height = Math.round(img.naturalHeight * k);
         c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-        resolve(c.toDataURL('image/jpeg', 0.8));
+        if (asBlob) c.toBlob(b => resolve(b), 'image/jpeg', 0.8);
+        else resolve(c.toDataURL('image/jpeg', 0.8));
       };
       img.onerror = () => resolve(null);
       img.src = src;
@@ -146,6 +148,10 @@
         img.alt = `菜單照片 ${i + 1}`;
         box.append(img);
       });
+      return box;
+    }
+    if (!CE.isDemo()) {
+      box.append(el('p', 'empty', '這份菜單沒有照片，可以按「📷 重新上傳」補上'));
       return box;
     }
     // 示意用的「原始照片」：故意歪斜、偏色的紙張，對照表格的整齊
@@ -372,8 +378,10 @@
       }
 
       const btns = el('div', 'btns mdlg__foot');
-      const go = button('btn btn--primary', `開始辨識${photos.length ? `（${photos.length} 張）` : ''}`, showLoading);
-      go.disabled = photos.length === 0;
+      const n = photos.length ? `（${photos.length} 張）` : '';
+      // 正式版沒有照片也能直接輸入品項；重新上傳沒選新照片時保留原本的照片
+      const go = CE.isDemo() ? button('btn btn--primary', `開始辨識${n}`, showLoading) : button('btn btn--primary', `下一步：輸入品項${n}`, startDraft);
+      go.disabled = CE.isDemo() && photos.length === 0;
       btns.append(button('btn', '取消', showMenu), go);
       dlg.append(body, btns);
     }
@@ -394,10 +402,23 @@
       }, FAKE_DELAY);
     }
 
+    // 正式版：有舊菜單就從它開始改，沒有就一列空白
+    function startDraft() {
+      const old = MD.getMenu(store.id);
+      rows = old ? D.fromSections(old.sections) : [{ category: '', name: '', price: '', note: '', uncertain: false }];
+      rowErrors = [];
+      showDraft('');
+    }
+
     // ── 4. 確認草稿 ──
     function showDraft(error) {
-      frame('確認辨識結果');
-      dlg.append(el('p', 'mdraft__tip', '請對照照片檢查。AI 沒把握的列標成黃色，價格讀不出來的留空；改過的列黃色就會消失。'));
+      if (CE.isDemo()) {
+        frame('確認辨識結果');
+        dlg.append(el('p', 'mdraft__tip', '請對照照片檢查。AI 沒把握的列標成黃色，價格讀不出來的留空；改過的列黃色就會消失。'));
+      } else {
+        frame('輸入菜單');
+        dlg.append(el('p', 'mdraft__tip', '對照照片輸入品項，價格看不清楚可以留空'));
+      }
 
       if (photos.length) {
         const strip = el('div', 'mdraft__strip');
@@ -460,15 +481,39 @@
       if (D.toSections(rows).length === 0) { showDraft('至少要有一個品項'); return; }
 
       const my = token;
-      const srcs = await Promise.all(photos.map(p => (p.kind === 'file' ? shrink(p.src) : Promise.resolve(p.src))));
-      if (my !== token || !dlg.open) return;
-      const sections = MD.assignIds(MD.getMenu(store.id), D.toSections(rows), store.id, new Date());
-      const menu = { updatedAt: today(), updatedBy: me() || '（未選身分）', sections, photos: srcs.filter(Boolean) };
-      if (MD.saveMenu(store.id, menu)) {
-        flash = '已儲存';
+      dlg.querySelectorAll('.mdlg__foot button').forEach(b => { b.disabled = true; }); // 上傳／存檔中不能重按
+      const old = MD.getMenu(store.id);
+      const sections = MD.assignIds(old, D.toSections(rows), store.id, new Date());
+      const menu = { updatedAt: today(), updatedBy: me() || '（未選身分）', sections, photos: [] };
+
+      if (CE.isDemo()) {
+        const srcs = await Promise.all(photos.map(p => (p.kind === 'file' ? shrink(p.src) : Promise.resolve(p.src))));
+        if (my !== token || !dlg.open) return;
+        menu.photos = srcs.filter(Boolean);
+        if (await MD.saveMenu(store.id, menu)) {
+          flash = '已儲存';
+        } else {
+          menu.photos = [];
+          flash = (await MD.saveMenu(store.id, menu)) ? '照片太大存不進瀏覽器，只存了表格' : '無法存到瀏覽器（可能是私密視窗），這次沒有儲存';
+        }
       } else {
-        menu.photos = [];
-        flash = MD.saveMenu(store.id, menu) ? '照片太大存不進瀏覽器，只存了表格' : '無法存到瀏覽器（可能是私密視窗），這次沒有儲存';
+        // 照片全部上傳成功才存菜單；有一張失敗就整份不存，草稿留著可以再試
+        const urls = [];
+        for (const p of photos) {
+          let url = p.src;
+          if (p.kind === 'file') {
+            const blob = await shrink(p.src, true);
+            url = blob && await MD.uploadPhoto(store.id, blob);
+          }
+          if (my !== token || !dlg.open) return;
+          if (!url) { showDraft('照片上傳失敗，這次沒有儲存'); return; }
+          urls.push(url);
+        }
+        menu.photos = photos.length ? urls : ((old && old.photos) || []);
+        const ok = await MD.saveMenu(store.id, menu);
+        if (my !== token || !dlg.open) return;
+        if (!ok) { showDraft('儲存失敗，請檢查網路後再試一次'); return; }
+        flash = '已儲存';
       }
       photos.forEach(p => { if (p.kind === 'file') URL.revokeObjectURL(p.src); });
       photos = [];
