@@ -187,7 +187,9 @@
 
   function renderStoreNotice() {
     const box = document.getElementById('store-notice');
-    const w = CE.storeRepo.warning();
+    // 店家讀不到用店家的訊息；菜單或同事名單讀不到時也要說（否則菜單看起來像沒建、「你是誰？」是空的）
+    const w = CE.storeRepo.warning() ||
+      (CE.menuData.loadFailed() || CE.memberRepo.loadFailed() ? '部分資料讀取失敗，請檢查網路後重新整理' : null);
     box.textContent = w || '';
     box.hidden = !w;
   }

@@ -646,3 +646,5 @@ button.pill { font: inherit; font-size: 13px; font-weight: 600; }
 .code__input { width: 100%; margin-top: 12px; }
 .code__err { min-height: 1.4em; margin: 8px 0 0; color: #dc2626; font-size: 13px; }
 .code__btns { justify-content: flex-end; margin-top: 12px; }
+.mdlg__who { display: flex; align-items: center; gap: 6px; margin-right: auto; font-size: 13px; font-weight: 700; }
+.mdlg__who .search { width: auto; padding: 6px 10px; }

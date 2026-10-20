@@ -1,6 +1,7 @@
 -- CRITIEAT 第一階段：店家、菜單、同事名單、菜單照片。
 -- 在 Supabase Dashboard → SQL Editor 整份貼上執行一次。可重複執行（已存在的東西會略過）。
 -- 權限：任何人可讀；可新增、修改店家與菜單（之後由 002_passcode.sql 加上通關碼）；任何人都不能刪除。
+-- ⚠️ 已經套用過 002_passcode.sql 之後，如果又重跑這份，新增／修改會變回「不用通關碼」——跑完這份一定要接著再跑一次 002_passcode.sql。
 
 -- ── 店家 ──
 create sequence if not exists store_seq;

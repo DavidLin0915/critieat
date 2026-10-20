@@ -64,8 +64,8 @@
     changed(store.id);
   }
 
-  async function saveLive(store, member) {
-    const row = Object.assign(E.toRow(store), { updated_by: member });
+  async function saveLive(store, member, now) {
+    const row = Object.assign(E.toRow(store), { updated_by: member, updated_at: now.toISOString() });
     try {
       let saved;
       if (store.id) {
@@ -93,7 +93,7 @@
   }
 
   async function save(store, member, now) {
-    return live() ? saveLive(store, member) : saveLocal(store, member, now);
+    return live() ? saveLive(store, member, now) : saveLocal(store, member, now);
   }
 
   async function remove(id, member, now) {

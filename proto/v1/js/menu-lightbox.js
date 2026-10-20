@@ -44,7 +44,10 @@
   }
 
   function me() {
-    try { return localStorage.getItem('critieat.me.v2') || ''; } catch (e) { return ''; }
+    let v = '';
+    try { v = localStorage.getItem('critieat.me.v2') || ''; } catch (e) { /* 讀不到當作沒選 */ }
+    // 正式版只認同事名單上的名字：沒選過、或是示範模式選的名字，都要先選
+    return CE.isDemo() || CE.memberRepo.list().includes(v) ? v : '';
   }
 
   function changed(storeId) {
@@ -474,7 +477,23 @@
 
       if (error) dlg.append(el('p', 'editor__err', error));
       const btns = el('div', 'btns mdlg__foot');
-      btns.append(button('btn', '取消（不儲存）', showMenu), button('btn btn--primary', '確認儲存', save));
+      const ok = button('btn btn--primary', '確認儲存', save);
+      if (!CE.isDemo() && !me()) {
+        const who = el('label', 'mdlg__who');
+        const sel = el('select', 'search');
+        sel.append(new Option('選名字', ''));
+        CE.memberRepo.list().forEach(m => sel.append(new Option(m, m)));
+        sel.addEventListener('change', () => {
+          if (!sel.value) return;
+          CE.lunchStore.setMe(sel.value); // 和店家燈箱共用
+          document.dispatchEvent(new CustomEvent('ce:me-change', { detail: { name: sel.value } }));
+          showDraft('');
+        });
+        who.append(el('span', null, '你是誰？'), sel);
+        btns.append(who);
+        ok.disabled = true;
+      }
+      btns.append(button('btn', '取消（不儲存）', showMenu), ok);
       dlg.append(btns);
     }
 
@@ -482,6 +501,7 @@
       rowErrors = D.validate(rows);
       if (rowErrors.some(Boolean)) { showDraft('有欄位需要修正'); return; }
       if (D.toSections(rows).length === 0) { showDraft('至少要有一個品項'); return; }
+      if (!CE.isDemo() && !me()) return;
 
       const my = token;
       dlg.querySelectorAll('.mdlg__foot button').forEach(b => { b.disabled = true; }); // 上傳／存檔中不能重按

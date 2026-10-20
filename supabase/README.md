@@ -6,7 +6,8 @@
 
 1. 打開 Supabase Dashboard → 你的專案 → 左側 **SQL Editor** → **New query**
 2. 把 `001_phase1.sql` 整份貼上，按 **Run**
-3. 看到 `Success. No rows returned` 就好（重複執行也沒關係）
+3. 看到 `Success. No rows returned` 就好
+4. ⚠️ 已經設過通關碼（⑥）之後若重跑 `001_phase1.sql`，通關碼保護會被拿掉：**跑完一定要接著再跑一次 `002_passcode.sql`**（通關碼本身不會變）
 
 ## ② 給網站連線資訊
 

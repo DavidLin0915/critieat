@@ -10,6 +10,7 @@
   const BUCKET = 'menu-photos';
   const live = () => !CE.isDemo();
   let liveMenus = {};   // live：{ [storeId]: Menu }
+  let menusFailed = false; // live：載入失敗時不准存，免得把讀不到的真菜單蓋掉
   let photoSeq = 0;
 
   // ── 比對用的正規化：全形英數符號與全形空白轉半形、去前後空白、英文轉小寫 ──
@@ -113,8 +114,10 @@
     try {
       const rows = await CE.supa.select('menus', 'select=*');
       liveMenus = Object.fromEntries(rows.map(r => [r.store_id, fromRow(r)]));
+      menusFailed = false;
       return true;
     } catch (e) {
+      menusFailed = true;
       return false;
     }
   }
@@ -122,6 +125,7 @@
   // 回傳 Promise<boolean>；正式版寫入成功才更新記憶體
   async function saveMenu(storeId, menu) {
     if (!live()) return writeSaved(Object.assign({}, loadSaved(), { [storeId]: menu }));
+    if (menusFailed) return false;
     const row = { store_id: storeId, sections: menu.sections, photos: menu.photos || [], updated_by: menu.updatedBy, updated_at: menu.updatedAt };
     try {
       await CE.supa.upsert('menus', row, 'store_id');
@@ -208,7 +212,7 @@
   }
 
   CE.menuData = {
-    KEY, norm, itemKey, isSaved, getMenu, hasMenu, ready, saveMenu, uploadPhoto, removeSaved,
+    KEY, norm, itemKey, isSaved, getMenu, hasMenu, ready, loadFailed: () => menusFailed, saveMenu, uploadPhoto, removeSaved,
     assignIds, ensureIds, items, findItem, matchItem, search,
   };
 })(globalThis.CE = globalThis.CE || {});
