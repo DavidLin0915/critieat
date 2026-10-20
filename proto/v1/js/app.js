@@ -17,6 +17,7 @@
     dayOverridden: false,
     hideClosed: false,
     selectedId: null,
+    loading: false,
   };
 
   // 所有使用者資料一律用 textContent 寫入，不用 innerHTML
@@ -62,6 +63,7 @@
     add.type = 'button';
     add.addEventListener('click', () => openForm(null));
     // 正式版沒有示範資料可重置：給一個空的片段，下面 append 照常
+    if (state.loading) { box.append(head, el('p', 'empty', '讀取店家中…')); return; }
     const reset = CE.isDemo() ? el('button', 'list__reset store__reset', '重置示範資料') : document.createDocumentFragment();
     if (CE.isDemo()) {
       reset.type = 'button';
@@ -249,16 +251,24 @@
     state.dayKey = CE.todayKey(new Date(), override);
     state.dayOverridden = state.dayKey === override;
     state.settings = CE.rowsToSettings(CE.parseCsv(CE.DEMO_SETTINGS_CSV));
-    state.all = CE.buildViewModel(CE.storeRepo.visible(), state.settings, state.dayKey);
     if (CE.isDemo()) CE.ratingUi.init(new Date());
+
+    document.getElementById('hide-closed').addEventListener('change', onToggleHideClosed);
+    document.getElementById('pick-btn').addEventListener('click', openPicker);
+    renderHeader();
+
+    // 正式版先從 Supabase 載入店家與同事名單；地圖同時開始載入
+    state.loading = true;
+    renderList();
+    const mapReady = CE.loadMap(CE.CONFIG.googleMapsKey, document.getElementById('map'), id => select(id, 'map'));
+    await Promise.all([CE.storeRepo.ready(), CE.memberRepo.ready()]);
+    state.loading = false;
+    state.all = CE.buildViewModel(CE.storeRepo.visible(), state.settings, state.dayKey);
 
     // 從開團單「在美食地圖上看這家」連過來時（?store=R006），直接選中那家店
     const startId = params.get('store');
     if (startId && findView(startId)) state.selectedId = startId;
 
-    document.getElementById('hide-closed').addEventListener('change', onToggleHideClosed);
-    document.getElementById('pick-btn').addEventListener('click', openPicker);
-    renderHeader();
     renderStoreNotice();
     renderList();
     renderDetail();
@@ -267,7 +277,7 @@
       if (item) item.scrollIntoView({ block: 'nearest' });
     }
 
-    await CE.loadMap(CE.CONFIG.googleMapsKey, document.getElementById('map'), id => select(id, 'map'));
+    await mapReady;
     CE.renderMarkers(visible(), state.settings);
     CE.selectMarker(findView(state.selectedId));
   }

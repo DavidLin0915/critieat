@@ -388,7 +388,8 @@
       return;
     }
     state.index = CE.buildBusIndex(CE.BUS_DATA, CE.CONFIG.busFeaturedStops);
-    state.stores = CE.storeRepo.visible();
+    const storesReady = CE.storeRepo.ready(); // 正式版從 Supabase 載入，跟地圖並行
+    state.stores = [];
     document.getElementById('data-label').textContent = `資料 TDX · ${state.index.fetchedAt}`;
 
     document.getElementById('bus-search').addEventListener('input', e => {
@@ -425,6 +426,8 @@
     await CE.loadBusMap(CE.CONFIG.googleMapsKey, document.getElementById('map'), onMapStation);
     CE.fitBusMapOnce(state.index.entryStations);
     renderMap();
+    await storesReady;
+    state.stores = CE.storeRepo.visible();
     CE.renderBusStores(state.stores, state.showStores);
   }
 

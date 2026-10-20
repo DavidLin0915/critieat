@@ -149,5 +149,28 @@
     return lines.join('\n') + '\n';
   }
 
-  CE.storeEdit = { CATEGORIES, DAYS, merge, nextId, isValidOverlay, validate, periodsToHours, cleanAddress, cleanMapsUrl, cleanPhone, toCsv };
+  // ── Supabase stores 表 ↔ Store ──
+  // 寫入時不送 id（新店由資料庫給號）與 updated_at（資料庫填現在時間）
+  function toRow(s) {
+    return {
+      name: s.name, category: s.category, area: s.area, address: s.address, phone: s.phone,
+      lat: s.lat, lng: s.lng, hours: s.hours, links: s.links, note: s.note,
+      place_id: s.placeId || null, visible: s.visible !== false, updated_by: s.updatedBy,
+    };
+  }
+
+  function fromRow(r) {
+    const o = r.hours || {};
+    const l = r.links || {};
+    return {
+      id: r.id, name: r.name, category: r.category, area: str(r.area), address: str(r.address), phone: str(r.phone),
+      lat: typeof r.lat === 'number' ? r.lat : null, lng: typeof r.lng === 'number' ? r.lng : null,
+      hours: Object.fromEntries(DAYS.map(d => [d, str(o[d])])),
+      links: Object.fromEntries(LINK_KEYS.map(k => [k, str(l[k])])),
+      note: str(r.note), placeId: str(r.place_id), visible: r.visible !== false,
+      updatedBy: str(r.updated_by), updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : '',
+    };
+  }
+
+  CE.storeEdit = { CATEGORIES, DAYS, merge, nextId, isValidStore, isValidOverlay, validate, periodsToHours, cleanAddress, cleanMapsUrl, cleanPhone, toCsv, toRow, fromRow };
 })(globalThis.CE = globalThis.CE || {});

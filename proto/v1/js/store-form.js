@@ -17,6 +17,7 @@
     dup: '這家已經有了',
     revived: '這家之前被移除過，儲存後會重新出現在地圖上',
     saveFail: '無法儲存到這台電腦的瀏覽器',
+    saveFailLive: '儲存失敗，請檢查網路後再試一次',
     mapFail: '地圖暫時無法使用，位置可之後再補',
   };
 
@@ -324,8 +325,10 @@
   }
 
   // ── 底部：身分、最後修改、按鈕／確認 ──
+  const saveFail = () => (CE.isDemo() ? TXT.saveFail : TXT.saveFailLive);
+
   function who() {
-    const members = CE.lunchStore.peekMembers();
+    const members = CE.memberRepo.list();
     const me = CE.lunchStore.getMe();
     return members.includes(me) ? me : '';
   }
@@ -358,7 +361,7 @@
       w.append(el('span', null, '你是誰？'));
       const sel = el('select', 'search');
       sel.append(new Option('選名字', ''));
-      CE.lunchStore.peekMembers().forEach(m => sel.append(new Option(m, m)));
+      CE.memberRepo.list().forEach(m => sel.append(new Option(m, m)));
       sel.addEventListener('change', () => {
         if (!sel.value) return;
         CE.lunchStore.setMe(sel.value); // 和開團單、評分同步
@@ -377,7 +380,12 @@
   function showConfirm(kind) { st.confirm = kind; renderFoot(); }
   function hideConfirm() { st.confirm = null; renderFoot(); }
 
-  function doSave() {
+  // 存檔中鎖住按鈕；回來時燈箱可能已經關了（st 換掉），就不再動它
+  function busy(on) {
+    st.dlg.querySelectorAll('.sdlg__foot button').forEach(b => { b.disabled = on || (b.classList.contains('sdlg__save') && !who()); });
+  }
+
+  async function doSave() {
     const me = who();
     if (!me) return;
     const v = E.validate(collect());
@@ -390,14 +398,28 @@
       return;
     }
     const store = Object.assign({}, v.store, { id: st.reviveId || st.id || CE.storeRepo.nextId(), visible: true });
-    if (!CE.storeRepo.save(store, me, new Date())) { setMsg(TXT.saveFail, 'warn'); return; }
-    finish(store.id);
+    const mine = st;
+    busy(true);
+    const r = await CE.storeRepo.save(store, me, new Date());
+    if (st !== mine) return;
+    busy(false);
+    if (!r.ok) {
+      // 資料庫擋下重複的 Google 店家（例如別人剛好先加了同一家）
+      if (r.dup) { const other = CE.storeRepo.findByPlaceId(store.placeId); setMsg(TXT.dup, 'warn', other && other.visible !== false ? other.id : ''); }
+      else setMsg(saveFail(), 'warn');
+      return;
+    }
+    finish(r.id);
   }
 
-  function doRemove() {
-    if (!CE.storeRepo.remove(st.id, who() || CE.lunchStore.getMe(), new Date())) {
+  async function doRemove() {
+    const mine = st;
+    busy(true);
+    const ok = await CE.storeRepo.remove(st.id, who() || CE.lunchStore.getMe(), new Date());
+    if (st !== mine) return;
+    if (!ok) {
       hideConfirm();
-      setMsg(TXT.saveFail, 'warn');
+      setMsg(saveFail(), 'warn');
       return;
     }
     finish(null);
