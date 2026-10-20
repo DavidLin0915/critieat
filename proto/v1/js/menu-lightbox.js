@@ -76,7 +76,10 @@
     dlg.id = 'menu-dlg';
     dlg.setAttribute('aria-label', '菜單');
     // 點背景（dialog 本身，不是內容）關閉
-    dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+    // 點背景關閉：按下與放開都要在背景上（在欄位裡拖曳選字、放開在燈箱外，不算點背景）
+    let downOnBackdrop = false;
+    dlg.addEventListener('mousedown', e => { downOnBackdrop = e.target === dlg; });
+    dlg.addEventListener('click', e => { if (e.target === dlg && downOnBackdrop) dlg.close(); downOnBackdrop = false; });
     document.body.append(dlg);
     return dlg;
   }

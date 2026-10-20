@@ -46,10 +46,8 @@
   }
 
   function renderHeader() {
-    const s = state.settings;
     const sim = state.dayOverridden ? '（模擬）' : '';
-    document.getElementById('today-label').textContent =
-      `週${DAY_LABEL[state.dayKey]}${sim} · 訂餐 ${CE.formatMin(s.orderStart)}–${CE.formatMin(s.orderEnd)} · 取餐 ${CE.formatMin(s.pickup)}`;
+    document.getElementById('today-label').textContent = `週${DAY_LABEL[state.dayKey]}${sim}`;
   }
 
   function renderList() {

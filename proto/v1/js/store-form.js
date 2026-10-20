@@ -75,7 +75,11 @@
     dlg = el('dialog', 'dlg mdlg sdlg');
     dlg.id = 'store-dlg';
     dlg.setAttribute('aria-label', '店家資料');
-    dlg.addEventListener('click', e => { if (e.target === dlg) requestClose(); });
+    // 點背景關閉：按下與放開都要在背景上。只看 click 的話，在燈箱內按下、放開時底下的東西換了
+    // （例如選 Google 候選後清單消失），瀏覽器會把 click 發給燈箱本身，被誤判成點背景
+    let downOnBackdrop = false;
+    dlg.addEventListener('mousedown', e => { downOnBackdrop = e.target === dlg; });
+    dlg.addEventListener('click', e => { if (e.target === dlg && downOnBackdrop) requestClose(); downOnBackdrop = false; });
     // Esc：有改過先問；瀏覽器若硬關（連按 Esc），重新打開並問
     dlg.addEventListener('cancel', e => { e.preventDefault(); requestClose(); });
     dlg.addEventListener('close', () => {
@@ -251,9 +255,13 @@
       close();
       if (!s) return;
       q.value = s.main;
+      const mine = st;
       try {
-        apply(await CE.places.details(s));
+        const info = await CE.places.details(s);
+        if (st !== mine) return; // Google 回來前燈箱已關或換了一家
+        apply(info);
       } catch (e) {
+        if (st !== mine) return;
         console.warn('[CRITIEAT] Google 店家資料讀取失敗', e);
         setMsg(TXT.googleFail, 'warn');
       }
