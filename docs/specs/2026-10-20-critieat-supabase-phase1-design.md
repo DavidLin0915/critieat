@@ -19,7 +19,7 @@
 |---|---|
 | 前端主機 | GitHub Pages（免費，repo 公開） |
 | 資料後端 | Supabase 免費方案（資料庫＋檔案空間）。使用者接受「連續 7 天沒人用會暫停、要手動恢復」 |
-| 網址 | 不要有 `/proto/v1`，直接 `https://<帳號>.github.io/critieat/` 就是美食地圖首頁 |
+| 網址 | 不要有 `/proto/v1`。2026-10-20 改為 GitHub 組織 `critieat` 的 repo `critieat.github.io` → **`https://critieat.github.io/`** 就是美食地圖首頁（放在根目錄，Google Places 只送網域當 referer 也對得上金鑰限制） |
 | 店家初始資料 | **不搬 `data.js` 的 10 家店**。正式版一開始店家清單是空的，使用者自己用「新增店家」（Google 帶入）一家家加 |
 | 共用範圍 | 店家（新增／編輯／移除）、菜單（品項＋照片） |
 | 防護 | 先不設防，讓地圖先能用；**團隊通關碼放在第一階段最後一步**再加 |
@@ -134,7 +134,7 @@
 
 ## 需要使用者提供／操作
 
-- GitHub 帳號：`DavidLin0915`（個人帳號）→ 網址 `https://davidlin0915.github.io/critieat/`
+- GitHub：組織 `critieat`、repo `critieat.github.io` → 網址 `https://critieat.github.io/`
 - 建立 Supabase 專案（或授權 Claude 引導操作），提供專案網址與 anon key
 - ~~真實同事名單~~（已提供，見 members）
 - 在 Google Cloud Console 加入 GitHub Pages 網址到 Maps key 限制

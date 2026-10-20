@@ -1,4 +1,4 @@
-# 把 proto/v1 發布成網站根目錄：https://davidlin0915.github.io/critieat/
+# 把 proto/v1 發布成網站根目錄：https://critieat.github.io/
 # tools/（一次性補資料工具）不發布。
 name: Deploy to GitHub Pages
 
