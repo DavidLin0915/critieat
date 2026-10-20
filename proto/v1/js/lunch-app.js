@@ -562,7 +562,7 @@
     menuBtn.type = 'button';
     menuBtn.addEventListener('click', () => CE.openMenu(store));
     const link = el('a', 'btn', '在美食地圖上看這家 →');
-    link.href = 'index.html?store=' + encodeURIComponent(store.id);
+    link.href = CE.demoHref('index.html?store=' + encodeURIComponent(store.id));
     const btns = el('div', 'btns');
     btns.append(menuBtn, link);
     box.append(btns);
@@ -750,6 +750,8 @@
   }
 
   function init() {
+    // 開團單第一階段不上正式版：正式網址直接回美食地圖
+    if (!CE.isDemo()) { location.replace('index.html'); return; }
     const t = now();
     state.settings = CE.rowsToSettings(CE.parseCsv(CE.DEMO_SETTINGS_CSV));
     state.db = { members: [], cards: [] };
@@ -763,7 +765,7 @@
     const params = new URLSearchParams(location.search);
     const newId = params.get('new');
     if (newId) {
-      history.replaceState(null, '', location.pathname);
+      history.replaceState(null, '', CE.demoHref(location.pathname));
       if (state.stores.some(s => s.id === newId)) state.pendingNew = { id: newId, as: params.get('as') === 'propose' ? 'propose' : 'open' };
     }
 

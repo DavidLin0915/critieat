@@ -104,10 +104,16 @@
         const open = rate.openId === it.id;
         const tr = el('tr', 'mitems__row' + (open ? ' is-open' : ''));
         tr.dataset.item = it.id;
-        tr.tabIndex = 0;
-        tr.setAttribute('aria-expanded', String(open));
         const name = el('td', 'mitems__name', it.name);
         if (it.note) name.append(el('span', 'mitems__note', it.note));
+        // 品項評分第二階段才上正式版：只有品名與價格，列不能點開
+        if (!CE.isDemo()) {
+          tr.append(name, el('td', 'mitems__price mono', price(it.price)));
+          table.append(tr);
+          return;
+        }
+        tr.tabIndex = 0;
+        tr.setAttribute('aria-expanded', String(open));
         const mine = IR.mineLabel(it.id);
         if (mine) name.append(el('span', 'mitems__mine', mine));
         const rt = el('td', 'mitems__rate' + (IR.summary(it.id) ? '' : ' is-none'), IR.badge(it.id));
@@ -203,7 +209,10 @@
         `最後更新 ${menu.updatedAt} · 由 ${menu.updatedBy || '—'} 整理` + (stale ? ` · 已 ${age} 天沒更新，價格可能有變` : '')));
       const actions = el('span', 'mdlg__actions');
       actions.append(button('btn mdlg__act', '📷 重新上傳', startUpload));
-      if (MD.isSaved(store.id) && CE.DEMO_MENUS && CE.DEMO_MENUS[store.id]) {
+      // 正式版不能刪菜單（資料庫不開放刪除），也沒有示範菜單可還原
+      if (!CE.isDemo()) {
+        // 只有「重新上傳」
+      } else if (MD.isSaved(store.id) && CE.DEMO_MENUS && CE.DEMO_MENUS[store.id]) {
         actions.append(button('linkbtn', '還原示範菜單', () => {
           MD.removeSaved(store.id);
           flash = '已還原成示範菜單';
@@ -238,6 +247,7 @@
       const sameName = name => menu.sections.reduce((n, s) => n + s.items.filter(x => x.name === name).length, 0) > 1;
 
       function paintTop() {
+        if (!CE.isDemo()) { top.hidden = true; return; }
         const list = CE.itemRatingUi.top(store.id);
         top.replaceChildren();
         top.hidden = tab !== 'table' || list.length === 0;

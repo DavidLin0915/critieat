@@ -6,6 +6,18 @@
   const nav = document.getElementById('site-nav');
   if (!hdr || !btn || !nav) return;
 
+  // 正式版還沒有開團單：拿掉連結。示範模式：站內連結帶 demo=1，頁首加「示範模式」
+  const CE = globalThis.CE || {};
+  if (CE.isDemo && !CE.isDemo()) {
+    nav.querySelectorAll('a[href^="lunch.html"]').forEach(a => a.remove());
+  } else if (CE.isDemo) {
+    nav.querySelectorAll('a[href$=".html"]').forEach(a => a.setAttribute('href', CE.demoHref(a.getAttribute('href'))));
+    const badge = document.createElement('span');
+    badge.className = 'pill demo-badge';
+    badge.textContent = '示範模式';
+    nav.after(badge);
+  }
+
   function setOpen(open) {
     hdr.classList.toggle('is-nav-open', open);
     document.documentElement.classList.toggle('nav-lock', open); // 選單開著時底下的頁面不捲動

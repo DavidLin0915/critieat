@@ -61,9 +61,12 @@
     const add = el('button', 'btn list__add', '＋ 新增店家');
     add.type = 'button';
     add.addEventListener('click', () => openForm(null));
-    const reset = el('button', 'list__reset store__reset', '重置示範資料');
-    reset.type = 'button';
-    reset.addEventListener('click', () => CE.storeRepo.reset());
+    // 正式版沒有示範資料可重置：給一個空的片段，下面 append 照常
+    const reset = CE.isDemo() ? el('button', 'list__reset store__reset', '重置示範資料') : document.createDocumentFragment();
+    if (CE.isDemo()) {
+      reset.type = 'button';
+      reset.addEventListener('click', () => CE.storeRepo.reset());
+    }
     box.append(head, add);
 
     if (state.all.length === 0) { box.append(el('p', 'empty', '還沒有店家資料'), reset); return; }
@@ -75,7 +78,7 @@
       item.dataset.id = v.id;
       if (v.status === 'closed') item.classList.add('is-closed');
       if (v.id === state.selectedId) item.classList.add('is-selected');
-      const rating = CE.ratingUi.summary(v.id);
+      const rating = CE.isDemo() && CE.ratingUi.summary(v.id); // 評分第二階段才上正式版
       const meta = [
         v.category, CE.formatDistance(v.distance), v.todayHours || '營業時間未填',
         rating && `★ ${CE.rating.formatStars(rating.avg)} (${rating.count})`,
@@ -139,7 +142,7 @@
       week
     );
     if (v.note) box.append(el('p', 'detail__note', v.note));
-    box.append(CE.ratingUi.section(v, onRatingChange));
+    if (CE.isDemo()) box.append(CE.ratingUi.section(v, onRatingChange));
 
     const btns = el('div', 'btns');
     const editBtn = el('button', 'btn detail__edit', '✏️ 編輯');
@@ -219,13 +222,13 @@
   function openPicker() {
     CE.openPicker({
       stores: visible(),
-      cards: CE.lunchStore.peekCards(),
+      cards: CE.isDemo() ? CE.lunchStore.peekCards() : [], // 正式版沒有共用的開團紀錄，不排除最近吃過
       days: state.settings.pickerDays,
       today: CE.lunch.todayStr(new Date()),
-      source: 'map',
+      source: CE.isDemo() ? 'map' : 'maplive',
       onPick(store, action) {
         if (action === 'map') { select(store.id, 'map'); return; }
-        location.href = `lunch.html?new=${encodeURIComponent(store.id)}&as=${action}`;
+        location.href = CE.demoHref(`lunch.html?new=${encodeURIComponent(store.id)}&as=${action}`);
       },
     });
   }
@@ -247,7 +250,7 @@
     state.dayOverridden = state.dayKey === override;
     state.settings = CE.rowsToSettings(CE.parseCsv(CE.DEMO_SETTINGS_CSV));
     state.all = CE.buildViewModel(CE.storeRepo.visible(), state.settings, state.dayKey);
-    CE.ratingUi.init(new Date());
+    if (CE.isDemo()) CE.ratingUi.init(new Date());
 
     // 從開團單「在美食地圖上看這家」連過來時（?store=R006），直接選中那家店
     const startId = params.get('store');

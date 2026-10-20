@@ -3,7 +3,7 @@
   // 午餐轉盤燈箱：款式分頁、候選與排除說明、開始鈕、抽到後的按鈕。
   // 用法：CE.openPicker({ stores, cards, days, today, source: 'map' | 'lunch', onPick(store, action) })
   //   stores：StoreView[]；cards：午餐卡（算最近吃過）；days：排除天數；today：'YYYY-MM-DD'
-  //   action：source 為 map 時 'open' | 'propose' | 'map'，為 lunch 時 'use'
+  //   action：source 為 map 時 'open' | 'propose' | 'map'，為 maplive（正式版，沒有開團單）時 'map'，為 lunch 時 'use'
   // 款式介面（pick-wheel.js、pick-plinko.js、pick-race.js）：
   //   CE.pickers[mode] = { label, startText, limit(small), ready?(), mount(box, stores, { onWin, small, reduced }) → { start(), destroy(), unavailable? } }
 //   ready()：外部資源（matter.js 是 async 載入）好了沒；mount 回傳 unavailable 時，燈箱等 ready() 變 true 再重畫
@@ -15,6 +15,7 @@
   const MODE_KEY = 'critieat.picker.mode';
   const ACTIONS = {
     map: [['用這家開單', 'open', true], ['用這家提議', 'propose'], ['在地圖上看這家', 'map']],
+    maplive: [['在地圖上看這家', 'map', true]],
     lunch: [['就這家', 'use', true]],
   };
 
