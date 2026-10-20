@@ -642,3 +642,7 @@ button.pill { font: inherit; font-size: 13px; font-weight: 600; }
 
 /* ── 正式版／示範模式 ── */
 .demo-badge { cursor: default; border-color: #bc13fe; color: #bc13fe; font-size: 12px; font-weight: 700; padding: 4px 10px; white-space: nowrap; }
+.code { width: min(380px, calc(100vw - 32px)); }
+.code__input { width: 100%; margin-top: 12px; }
+.code__err { min-height: 1.4em; margin: 8px 0 0; color: #dc2626; font-size: 13px; }
+.code__btns { justify-content: flex-end; margin-top: 12px; }

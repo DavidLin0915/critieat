@@ -31,3 +31,17 @@ Table Editor → 點 `stores`（或 `menus`、`members`）→ 右上 **Export** 
 ## ⑤ 增刪同事
 
 Table Editor → `members` → 新增或刪除一列。`sort` 是名單順序（數字小的在前）。
+
+## ⑥ 團隊通關碼（只擋修改）
+
+1. SQL Editor 貼上 `002_passcode.sql` 整份執行
+2. 設定通關碼：在 SQL Editor 執行（把 `abc123` 換成你要的碼）
+
+   ```sql
+   insert into team_secret (id, code) values (1, 'abc123') on conflict (id) do update set code = excluded.code;
+   ```
+
+   通關碼只能用**英文字母、數字和一般符號**（不能有中文或空白）。
+3. **更換通關碼**：同一行換個碼再執行一次。同事下次修改資料時網站會再問一次。
+
+看地圖、看菜單不需要通關碼；新增／修改店家、存菜單、上傳照片才需要。刪除一直都不開放。
