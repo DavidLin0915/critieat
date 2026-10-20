@@ -7,8 +7,8 @@
     // 公車地圖上要用不同顏色標出的常用站牌（站名要與清單上完全相同，同名的每個站位都會標）
     // Supabase：Project URL 與 publishable key（sb_publishable_… 或舊版 anon）。這兩個本來就公開，放這裡沒關係。
     // secret / service_role key 絕對不能放進任何檔案。留空時網站以示範模式運作。
-    supabaseUrl: 'https://lmzfjslivlmmouqagfhd.supabase.co',
-    supabaseKey: 'sb_publishable_8HT3s-YeaFJY9bw56I7tOQ_KDoBtT-O',
+    supabaseUrl: 'https://ehfshxwmfmwubhpuzccy.supabase.co',
+    supabaseKey: 'sb_publishable_Ehsc2LvyHsaYDyUs8mYe6A_xs54cd0D',
     busFeaturedStops: ['南港行政中心(南港車站)', '南港', '玉成國小', '捷運昆陽站'],
   };
 })(globalThis.CE = globalThis.CE || {});
