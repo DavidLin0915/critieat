@@ -1,0 +1,21 @@
+(function () {
+  'use strict';
+  // 手機版漢堡選單：切換 .hdr.is-nav-open；桌機寬度按鈕隱藏，不影響導覽列
+  const hdr = document.querySelector('.hdr');
+  const btn = document.getElementById('nav-btn');
+  const nav = document.getElementById('site-nav');
+  if (!hdr || !btn || !nav) return;
+
+  function setOpen(open) {
+    hdr.classList.toggle('is-nav-open', open);
+    document.documentElement.classList.toggle('nav-lock', open); // 選單開著時底下的頁面不捲動
+    btn.setAttribute('aria-expanded', String(open));
+    btn.setAttribute('aria-label', open ? '關閉選單' : '開啟選單');
+  }
+
+  btn.addEventListener('click', () => setOpen(!hdr.classList.contains('is-nav-open')));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') setOpen(false); });
+  document.addEventListener('click', e => { if (!hdr.contains(e.target)) setOpen(false); });
+  // 全螢幕選單：點連結以外的空白處關閉
+  nav.addEventListener('click', e => { if (e.target === nav) setOpen(false); });
+})();

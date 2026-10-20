@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CRITIEAT 公車地圖</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="blob blob--cyan" aria-hidden="true"></div>
+  <div class="blob blob--purple" aria-hidden="true"></div>
+
+  <div class="app">
+    <header class="hdr">
+      <img class="logo" src="img/logo.png" alt="CRITIEAT" width="158" height="28">
+      <button class="hamb" type="button" id="nav-btn" aria-expanded="false" aria-controls="site-nav" aria-label="開啟選單"><span></span><span></span><span></span></button>
+      <nav class="nav" id="site-nav">
+        <a href="index.html">美食地圖</a>
+        <a href="lunch.html">開團單</a>
+        <a class="is-active" href="bus.html">公車地圖</a>
+      </nav>
+      <div class="hdr__right">
+        <span id="data-label" class="today mono"></span>
+        <label class="pill mono"><input type="checkbox" id="show-stores" checked> 顯示店家</label>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="list list--bus" aria-label="站牌與路線">
+        <input class="search" id="bus-search" type="search" placeholder="搜尋站名或路線，例如 昆陽、306" autocomplete="off" aria-label="搜尋站名或路線">
+        <div class="tabs" role="tablist">
+          <button class="tab" type="button" role="tab" id="tab-stations" data-tab="stations"></button>
+          <button class="tab" type="button" role="tab" id="tab-routes" data-tab="routes"></button>
+          <button class="tab" type="button" role="tab" id="tab-trip" data-tab="trip">起 → 迄</button>
+        </div>
+        <div class="trip" id="trip-form" hidden>
+          <label class="trip__row"><span class="trip__dot trip__dot--from"></span><input class="search" id="trip-from" placeholder="起站（南港這一帶的站牌）" autocomplete="off" aria-label="起站"></label>
+          <label class="trip__row"><span class="trip__dot trip__dot--to"></span><input class="search" id="trip-to" placeholder="迄站" autocomplete="off" aria-label="迄站"></label>
+          <button class="btn trip__swap" type="button" id="trip-swap">⇅ 起迄對調</button>
+        </div>
+        <div class="list__body" id="bus-list"></div>
+      </section>
+      <div class="map-wrap"><div class="map" id="map"></div></div>
+      <aside class="detail detail--bus" id="detail" aria-label="站牌或路線詳情" hidden></aside>
+    </main>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/csv.js"></script>
+  <script src="js/hours.js"></script>
+  <script src="js/stores.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/store-edit.js"></script>
+  <script src="js/store-repo.js"></script>
+  <script src="js/bus-data.js"></script>
+  <script src="js/bus.js"></script>
+  <script src="js/bus-map.js"></script>
+  <script src="js/bus-combo.js"></script>
+  <script src="js/bus-app.js"></script>
+  <script src="js/nav.js"></script>
+</body>
+</html>

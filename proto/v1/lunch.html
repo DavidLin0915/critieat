@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CRITIEAT 開團單</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="blob blob--cyan" aria-hidden="true"></div>
+  <div class="blob blob--purple" aria-hidden="true"></div>
+
+  <div class="app">
+    <header class="hdr">
+      <img class="logo" src="img/logo.png" alt="CRITIEAT" width="158" height="28">
+      <button class="hamb" type="button" id="nav-btn" aria-expanded="false" aria-controls="site-nav" aria-label="開啟選單"><span></span><span></span><span></span></button>
+      <nav class="nav" id="site-nav">
+        <a href="index.html">美食地圖</a>
+        <a class="is-active" href="lunch.html">開團單</a>
+        <a href="bus.html">公車地圖</a>
+      </nav>
+      <div class="hdr__right">
+        <span id="today-label" class="today mono"></span>
+        <button class="pill" type="button" id="me-btn"></button>
+      </div>
+    </header>
+    <p class="notice" id="notice" role="status" hidden></p>
+
+    <main class="main main--lunch">
+      <section class="list" id="card-list" aria-label="今天的午餐卡"></section>
+      <section class="lcard" id="card-view" aria-label="午餐卡內容"></section>
+      <aside class="detail lside" id="side" aria-label="店家資訊或訂餐彙總" hidden></aside>
+    </main>
+  </div>
+
+  <dialog class="dlg" id="me-dlg" aria-label="選擇身分"></dialog>
+  <dialog class="dlg" id="new-dlg" aria-label="提議或開單"></dialog>
+
+  <script src="js/csv.js"></script>
+  <script src="js/hours.js"></script>
+  <script src="js/geo.js"></script>
+  <script src="js/stores.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/store-edit.js"></script>
+  <script src="js/store-repo.js"></script>
+  <script src="js/lunch.js"></script>
+  <script src="js/lunch-demo.js"></script>
+  <script src="js/lunch-store.js"></script>
+  <script src="js/menu-demo.js"></script>
+  <script src="js/menu-data.js"></script>
+  <script src="js/menu-draft.js"></script>
+  <script src="js/menu-lightbox.js"></script>
+  <script src="js/menu-combo.js"></script>
+  <script src="js/rating.js"></script>
+  <script src="js/item-rating-demo.js"></script>
+  <script src="js/rating-store.js"></script>
+  <script src="js/star-picker.js"></script>
+  <script src="js/rating-form.js"></script>
+  <script src="js/item-rating-ui.js"></script>
+  <script src="js/pick.js"></script>
+  <script src="js/pick-wheel.js"></script>
+  <script src="js/pick-plinko.js"></script>
+  <script async src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+  <script src="js/pick-race-maps.js"></script>
+  <script src="js/pick-race.js"></script>
+  <script src="js/pick-lightbox.js"></script>
+  <script src="js/lunch-app.js"></script>
+  <script src="js/nav.js"></script>
+</body>
+</html>

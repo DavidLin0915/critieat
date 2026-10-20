@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>店家資料補齊工具</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    body { overflow: auto; }
+    .bf { max-width: 1200px; margin: 0 auto; padding: 28px 20px 60px; display: flex; flex-direction: column; gap: 14px; }
+    .bf h1 { margin: 0; font-size: 22px; }
+    .bf p { margin: 0; font-size: 13.5px; color: var(--muted); }
+    .bf__msg { font-weight: 700; color: var(--yellow-ink) !important; }
+    .bf table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .bf th, .bf td { padding: 7px 6px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    .bf th { font-size: 12px; color: var(--muted); }
+    .bf tr.is-flag td { background: var(--yellow-bg); }
+    .bf__hours { white-space: pre-line; font-family: var(--mono); font-size: 11.5px; }
+    .bf__dist { font-family: var(--mono); text-align: right; }
+    .bf textarea { width: 100%; min-height: 220px; font-family: var(--mono); font-size: 12px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; }
+    .bf .btns { margin-top: 0; }
+    .bf button.btn { cursor: pointer; }
+  </style>
+</head>
+<body>
+  <main class="bf">
+    <h1>店家資料補齊工具（一次性）</h1>
+    <p>用 Google 查 data.js 裡每一家的地址、電話、營業時間。黃色列請人工確認（位置差超過 150 公尺、店名對不上、或查不到），預設不勾。勾好後產生 CSV，貼回給 Claude 寫進 data.js。這頁只在 http://localhost:8000 能用。</p>
+    <div class="btns">
+      <button class="btn btn--primary" type="button" id="bf-start">開始查詢</button>
+      <button class="btn" type="button" id="bf-gen" disabled>產生 CSV</button>
+      <button class="btn" type="button" id="bf-copy" disabled>複製</button>
+    </div>
+    <p class="bf__msg" id="bf-msg" role="status"></p>
+    <table>
+      <thead><tr><th>用</th><th>我們的店名</th><th>Google 店名</th><th>Google 地址</th><th>距離</th><th>電話</th><th>營業時間</th><th>狀態</th></tr></thead>
+      <tbody id="bf-rows"></tbody>
+    </table>
+    <textarea id="bf-out" readonly placeholder="產生的 CSV 會出現在這裡"></textarea>
+  </main>
+  <script src="../js/config.js"></script>
+  <script src="../js/csv.js"></script>
+  <script src="../js/hours.js"></script>
+  <script src="../js/geo.js"></script>
+  <script src="../js/stores.js"></script>
+  <script src="../js/data.js"></script>
+  <script src="../js/store-edit.js"></script>
+  <script src="../js/places.js"></script>
+  <script src="backfill.js"></script>
+</body>
+</html>
