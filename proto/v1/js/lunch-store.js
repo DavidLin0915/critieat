@@ -9,6 +9,10 @@
   const live = () => !CE.isDemo();
   let cache = [];        // live：全部卡片
   let failed = false;
+  let loaded = false;    // live：全部卡片抓過一次了
+  let seq = 0;           // 每次 refresh 的序號；比較晚發出的已經套用了，較早的回應就丟掉
+  let applied = 0;
+  const RECENT_DAYS = 2; // 之後只重抓最近幾天（過去的卡片唯讀，不會再變）；含昨天，跨午夜也不漏
 
   // 回傳字串、null（沒有資料），或 undefined（localStorage 無法使用）
   function read(key) {
@@ -36,8 +40,17 @@
 
   async function refresh() {
     if (!live()) return true;
+    const my = ++seq;
     try {
-      cache = CE.lunchSync.fromRows(await CE.supa.select('lunch_cards', CE.lunchSync.SELECT));
+      const since = loaded ? CE.lunch.todayStr(new Date(Date.now() - RECENT_DAYS * 86400000)) : '';
+      const rows = since
+        ? await CE.supa.select('lunch_cards', CE.lunchSync.SELECT + '&date=gte.' + since)
+        : await CE.supa.selectAll('lunch_cards', CE.lunchSync.SELECT);
+      if (my < applied) return true;
+      applied = my;
+      const fresh = CE.lunchSync.fromRows(rows);
+      cache = since ? cache.filter(c => c.date < since).concat(fresh) : fresh;
+      loaded = true;
       failed = false;
       return true;
     } catch (e) {

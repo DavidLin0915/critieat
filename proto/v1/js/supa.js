@@ -89,6 +89,23 @@
       return request(rest(table, query), { method: 'GET', headers: headers() });
     },
 
+    // 一次最多回 1000 列（Supabase 預設上限），用 Range 一頁一頁抓到最後
+    async selectAll(table, query) {
+      const PAGE = 1000;
+      let out = [];
+      for (let from = 0; ; from += PAGE) {
+        let rows;
+        try {
+          rows = await request(rest(table, query), { method: 'GET', headers: headers({ 'Range-Unit': 'items', Range: `${from}-${from + PAGE - 1}` }) });
+        } catch (e) {
+          if (e instanceof SupaError && e.status === 416) return out; // 剛好整頁抓完
+          throw e;
+        }
+        out = out.concat(rows || []);
+        if (!rows || rows.length < PAGE) return out;
+      }
+    },
+
     async insert(table, row) {
       return first(await write(() => request(rest(table), { method: 'POST', headers: headers(withCode(JSON_WRITE)), body: JSON.stringify(row) })));
     },

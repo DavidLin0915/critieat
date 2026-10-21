@@ -25,7 +25,7 @@
     async function ready() {
       if (!live()) return true;
       try {
-        cache = (await CE.supa.select(table, 'select=*')).map(fromRow);
+        cache = (await CE.supa.selectAll(table, 'select=*')).map(fromRow);
         failed = false;
         return true;
       } catch (e) {

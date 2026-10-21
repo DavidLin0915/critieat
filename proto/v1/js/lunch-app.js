@@ -26,6 +26,7 @@
     pendingNew: null,    // 從網址或選身分前要求的「提議／開單」：{ id, as }
     busy: false,         // 正式版：動作送出中，不接受下一個動作
     cardStale: false,    // 正式版：別人改了資料，但我正在中欄輸入，等離開輸入框再重畫中欄
+    remotePending: false, // 正式版：動作送出中收到別人的變動，做完再補抓
   };
 
   // 所有資料一律用 textContent 寫入，不用 innerHTML
@@ -163,6 +164,11 @@
         return;
       }
       const removed = before.filter(c => !next.some(n => n.id === c.id)).map(c => c.id);
+      // 這次改到的既有卡片（新建的不算）：寫完後如果不見了，就是剛好被別人取消，寫入其實沒有生效
+      const touched = next.filter(n => {
+        const o = before.find(c => c.id === n.id);
+        return o && JSON.stringify(o) !== JSON.stringify(n);
+      }).map(c => c.id);
       try {
         await CE.lunchStore.apply(CE.lunchSync.diff(before, next));
       } catch (e) {
@@ -173,11 +179,20 @@
         return;
       }
       if (!(await pull(removed))) state.db = Object.assign({}, state.db, { cards: next });
+      if (touched.some(id => !state.db.cards.some(c => c.id === id))) {
+        notice(GONE);
+        render();
+        return;
+      }
       notice('');
       if (onOk) onOk();
       render();
     } finally {
       state.busy = false;
+      if (state.remotePending) {
+        state.remotePending = false;
+        onRemote();
+      }
     }
   }
 
@@ -188,7 +203,7 @@
   };
 
   async function onRemote() {
-    if (state.busy) return; // 動作做完會自己抓最新資料
+    if (state.busy) { state.remotePending = true; return; } // 動作做完再補抓
     if (!(await pull())) return;
     if (editing()) {
       state.cardStale = true;
@@ -863,11 +878,23 @@
     }
 
     $('me-btn').addEventListener('click', () => openMe(false));
-    // 別人的更新先擱著的中欄：焦點離開中欄才重畫
-    $('card-view').addEventListener('focusout', e => {
-      if (!state.cardStale || (e.relatedTarget && $('card-view').contains(e.relatedTarget))) return;
+    // 別人的更新先擱著的中欄：焦點離開中欄、而且沒有按著滑鼠時才重畫。
+    // Safari／Firefox 點按鈕時焦點不會移到按鈕上，按下去就先 focusout；這時重畫會把按鈕換掉，這次點擊就不見了，所以等放開滑鼠再畫。
+    let pointerDown = false;
+    const flushStale = () => {
+      if (!state.cardStale || pointerDown || editing()) return;
       state.cardStale = false;
-      setTimeout(renderCard, 0); // 等這次點擊／切換焦點完成再重畫
+      render(); // 選中的卡片可能已換成別張，要連編輯區一起重建
+    };
+    $('card-view').addEventListener('pointerdown', () => { pointerDown = true; });
+    document.addEventListener('pointerup', () => {
+      if (!pointerDown) return;
+      pointerDown = false;
+      setTimeout(flushStale, 0); // 等這次的 click 處理完
+    }, true);
+    $('card-view').addEventListener('focusout', e => {
+      if (e.relatedTarget && $('card-view').contains(e.relatedTarget)) return;
+      setTimeout(flushStale, 0);
     });
     render();
     if (loadWarning) warn(loadWarning);
