@@ -9,9 +9,11 @@
   const STATUS_RANK = { ordering: 0, proposed: 1, closed: 2 };
   let seq = 0;
 
+  // 加 4 碼隨機尾碼：多台電腦同一毫秒建立也不會撞號
   function newId(prefix, now) {
     seq += 1;
-    return prefix + now.getTime().toString(36) + seq.toString(36);
+    const tail = Math.floor(Math.random() * 36 ** 4).toString(36).padStart(4, '0');
+    return prefix + now.getTime().toString(36) + seq.toString(36) + tail;
   }
 
   function clone(card) {
