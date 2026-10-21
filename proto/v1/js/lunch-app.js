@@ -24,6 +24,8 @@
     copied: false,
     copyFallback: false,
     pendingNew: null,    // 從網址或選身分前要求的「提議／開單」：{ id, as }
+    busy: false,         // 正式版：動作送出中，不接受下一個動作
+    cardStale: false,    // 正式版：別人改了資料，但我正在中欄輸入，等離開輸入框再重畫中欄
   };
 
   // 所有資料一律用 textContent 寫入，不用 innerHTML
@@ -63,6 +65,9 @@
   const isBlank = r => [r.name, r.price, r.note].every(v => String(v == null ? '' : v).trim() === '');
 
   const SAVE_FAILED = '無法存到瀏覽器，重新整理後這次的變更會不見';
+  const WRITE_FAILED = '儲存失敗，請檢查網路後再試一次';
+  const LOAD_FAILED = '開團單讀取失敗，請檢查網路後重新整理';
+  const GONE = '這團已經被取消了';
 
   function renderNotice() {
     const box = $('notice');
@@ -106,6 +111,11 @@
 
   // 執行一個卡片操作：fn(舊 cards) → 新 cards。成功就存檔、執行 onOk、重畫；失敗顯示錯誤訊息。
   function act(fn, onOk) {
+    if (CE.isDemo()) actDemo(fn, onOk);
+    else actLive(fn, onOk);
+  }
+
+  function actDemo(fn, onOk) {
     let next;
     try {
       next = fn(state.db.cards);
@@ -124,7 +134,75 @@
     render();
   }
 
+  // 正式版：重新抓資料庫的最新卡片。選中的卡片不見了就改選第一張並提示（quiet 裡的是自己剛取消的，不提示）
+  async function pull(quiet) {
+    if (!(await CE.lunchStore.refresh())) return false;
+    state.db = Object.assign({}, state.db, { cards: CE.lunchStore.cards() });
+    if (state.warning === LOAD_FAILED) warn('');
+    const id = state.selectedId;
+    if (id && !state.db.cards.some(c => c.id === id)) {
+      selectFirst();
+      if (!(quiet || []).includes(id)) notice(GONE);
+    }
+    return true;
+  }
+
+  // 正式版：先抓最新資料、用最新資料跑操作，再把差異逐筆寫進資料庫（只寫自己碰到的列）
+  async function actLive(fn, onOk) {
+    if (state.busy) return;
+    state.busy = true;
+    try {
+      if (!(await pull())) { notice(WRITE_FAILED); render(); return; }
+      const before = state.db.cards;
+      let next;
+      try {
+        next = fn(before);
+      } catch (e) {
+        if (state.message !== GONE) notice(e.message);
+        render();
+        return;
+      }
+      const removed = before.filter(c => !next.some(n => n.id === c.id)).map(c => c.id);
+      try {
+        await CE.lunchStore.apply(CE.lunchSync.diff(before, next));
+      } catch (e) {
+        console.warn('[CRITIEAT] 開團單寫入失敗', e);
+        notice(WRITE_FAILED);
+        await pull();
+        render();
+        return;
+      }
+      if (!(await pull(removed))) state.db = Object.assign({}, state.db, { cards: next });
+      notice('');
+      if (onOk) onOk();
+      render();
+    } finally {
+      state.busy = false;
+    }
+  }
+
+  // 正式版：別人改了開團單。我正在中欄輸入時不重畫中欄（輸入框、游標、打到一半的字都留著）
+  const editing = () => {
+    const a = document.activeElement;
+    return !!a && $('card-view').contains(a) && a.matches('input, textarea, select');
+  };
+
+  async function onRemote() {
+    if (state.busy) return; // 動作做完會自己抓最新資料
+    if (!(await pull())) return;
+    if (editing()) {
+      state.cardStale = true;
+      renderHeader();
+      renderList();
+      renderSide();
+    } else {
+      state.cardStale = false;
+      render();
+    }
+  }
+
   function addMember(name) {
+    if (!CE.isDemo()) return; // 正式版名單在 Supabase 的 members 表
     if (state.db.members.includes(name)) return;
     state.db = Object.assign({}, state.db, { members: state.db.members.concat([name]) });
     CE.lunchStore.save(state.db);
@@ -257,7 +335,7 @@
       isPast()
         ? button('btn btn--primary list__new', '← 回到今天', () => goDay(state.day))
         : button('btn btn--primary list__new', '＋ 提議／開單', () => openNew()),
-      button('list__reset', '重置示範資料', resetDemo)
+      CE.isDemo() ? button('list__reset', '重置示範資料', resetDemo) : document.createDocumentFragment()
     );
   }
 
@@ -629,7 +707,8 @@
   function openMe(required) {
     const d = $('me-dlg');
     d.replaceChildren();
-    d.append(el('h3', 'dlg__title', '你是誰？'), el('p', 'hint', '選自己的名字；名單裡沒有就新增。只存在這台電腦的瀏覽器。'));
+    const live = !CE.isDemo();
+    d.append(el('h3', 'dlg__title', '你是誰？'), el('p', 'hint', live ? '選自己的名字。只存在這台電腦的瀏覽器。' : '選自己的名字；名單裡沒有就新增。只存在這台電腦的瀏覽器。'));
     const grid = el('div', 'members');
     state.db.members.forEach(m => {
       grid.append(button('voter voter--btn' + (m === state.me ? ' is-active' : ''), m, () => { d.close(); setMe(m); }));
@@ -644,7 +723,8 @@
     };
     name.addEventListener('keydown', e => { if (e.key === 'Enter') join(); });
     add.append(name, button('btn btn--primary', '加入', join));
-    d.append(grid, add);
+    d.append(grid);
+    if (!live) d.append(add); // 正式版不能自己加名字
     if (!required) {
       const btns = el('div', 'btns');
       btns.append(button('btn', '取消', () => d.close()));
@@ -749,15 +829,28 @@
     if (card && span && card.status === 'ordering') span.textContent = countdownText(card);
   }
 
-  function init() {
-    // 開團單第一階段不上正式版：正式網址直接回美食地圖
-    if (!CE.isDemo()) { location.replace('index.html'); return; }
+  async function init() {
     const t = now();
+    const live = !CE.isDemo();
     state.settings = CE.rowsToSettings(CE.parseCsv(CE.DEMO_SETTINGS_CSV));
     state.db = { members: [], cards: [] };
     refreshDay();
-    const loaded = CE.lunchStore.load(t);
-    state.db = loaded.db;
+    let loadWarning = null;
+    if (live) {
+      // 正式版：從 Supabase 載入店家、同事、菜單、開團單與品項評分
+      $('card-list').append(el('p', 'empty', '讀取開團單中…'));
+      await Promise.all([
+        CE.storeRepo.ready(), CE.memberRepo.ready(), CE.menuData.ready(), CE.lunchStore.ready(),
+        CE.itemRatingStore.ready ? CE.itemRatingStore.ready() : true,
+      ]);
+      state.stores = CE.buildViewModel(CE.storeRepo.visible(), state.settings, CE.todayKey(t));
+      state.db = { members: CE.lunchStore.peekMembers(), cards: CE.lunchStore.cards() };
+      if (CE.lunchStore.loadFailed()) loadWarning = LOAD_FAILED;
+    } else {
+      const loaded = CE.lunchStore.load(t);
+      state.db = loaded.db;
+      loadWarning = loaded.warning;
+    }
     state.me = CE.lunchStore.getMe();
     if (state.me) addMember(state.me);
     selectFirst();
@@ -770,8 +863,15 @@
     }
 
     $('me-btn').addEventListener('click', () => openMe(false));
+    // 別人的更新先擱著的中欄：焦點離開中欄才重畫
+    $('card-view').addEventListener('focusout', e => {
+      if (!state.cardStale || (e.relatedTarget && $('card-view').contains(e.relatedTarget))) return;
+      state.cardStale = false;
+      setTimeout(renderCard, 0); // 等這次點擊／切換焦點完成再重畫
+    });
     render();
-    if (loaded.warning) warn(loaded.warning);
+    if (loadWarning) warn(loadWarning);
+    if (live) CE.liveSync.watch({ tables: ['lunch_cards', 'lunch_votes', 'lunch_items'], onChange: onRemote });
     if (!state.me) openMe(true);
     else if (state.pendingNew) { const p = state.pendingNew; state.pendingNew = null; openNew(p); }
     setInterval(tick, 30000);
