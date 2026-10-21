@@ -355,7 +355,7 @@ button.pill { font: inherit; font-size: 13px; font-weight: 600; }
 .dlg[open] { display: flex; flex-direction: column; gap: 14px; }
 .dlg__title { margin: 0; font-size: 18px; }
 .dlg__row { display: flex; gap: 8px; }
-.dlg__row .search { flex: 1; width: auto; }
+.dlg__row .search { flex: 1; width: auto; min-width: 0; text-overflow: ellipsis; } /* 店名很長時不把視窗撐寬 */
 .dlg__field { display: flex; flex-direction: column; gap: 6px; }
 .dlg__field .sect { margin-top: 0; }
 .dlg .btns { justify-content: flex-end; margin-top: 4px; }
