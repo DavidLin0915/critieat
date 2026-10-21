@@ -1,6 +1,6 @@
 # CRITIEAT 的 Supabase 設定
 
-正式版的店家、菜單、同事名單與菜單照片都存在 Supabase（免費方案，Tokyo）。
+正式版的店家、菜單、同事名單、菜單照片、開團單與評分都存在 Supabase（免費方案，Tokyo）。
 
 ## ① 建立資料表（只做一次）
 
@@ -26,7 +26,7 @@ Project Settings → **API Keys**（或 Data API）：
 
 ## ④ 備份
 
-Table Editor → 點 `stores`（或 `menus`、`members`）→ 右上 **Export** → **Export to CSV**。
+Table Editor → 點 `stores`（或 `menus`、`members`、`lunch_cards`、`lunch_votes`、`lunch_items`、`store_ratings`、`item_ratings`）→ 右上 **Export** → **Export to CSV**。
 菜單照片在 Storage → `menu-photos`，需要時可整個資料夾下載。
 
 ## ⑤ 增刪同事
@@ -45,4 +45,10 @@ Table Editor → `members` → 新增或刪除一列。`sort` 是名單順序（
    通關碼只能用**英文字母、數字和一般符號**（不能有中文或空白）。
 3. **更換通關碼**：同一行換個碼再執行一次。同事下次修改資料時網站會再問一次。
 
-看地圖、看菜單不需要通關碼；新增／修改店家、存菜單、上傳照片才需要。刪除一直都不開放。
+看資料不需要通關碼；新增／修改／刪除開團單與評分、修改店家與菜單、上傳照片才需要。店家與菜單不能刪除。
+
+## ⑦ 第二階段資料表（開團單、評分；只做一次）
+
+1. SQL Editor 貼上 `003_phase2.sql` 整份執行（要先跑過 ① 和 ⑥）
+2. 看到 `Success. No rows returned` 就好。可重複執行，不會動到通關碼
+3. 這份也會把開團單三張表加進 Realtime，網頁才能即時看到別人的變動
