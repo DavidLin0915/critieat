@@ -1,9 +1,14 @@
 (function (CE) {
   'use strict';
-  // 開團單資料存在瀏覽器 localStorage。讀不到（私密視窗、被封鎖）或格式壞掉時改用示範資料。
+  // 示範模式：開團單資料存在瀏覽器 localStorage。讀不到（私密視窗、被封鎖）或格式壞掉時改用示範資料。
+  // 正式版（live）：Supabase 的 lunch_cards／lunch_votes／lunch_items。ready()／refresh() 抓全部卡片放記憶體，
+  //   cards() 同步讀；寫入用 apply(ops)（ops 由 CE.lunchSync.diff 算出），逐筆送出。名單用 CE.memberRepo。
   const KEY = 'critieat.lunch.v2';
   const ME_KEY = 'critieat.me.v2';
   const BROKEN = '本機資料無法讀取，已載入示範資料';
+  const live = () => !CE.isDemo();
+  let cache = [];        // live：全部卡片
+  let failed = false;
 
   // 回傳字串、null（沒有資料），或 undefined（localStorage 無法使用）
   function read(key) {
@@ -29,8 +34,34 @@
     return { db, warning: raw === null ? null : BROKEN };
   }
 
+  async function refresh() {
+    if (!live()) return true;
+    try {
+      cache = CE.lunchSync.fromRows(await CE.supa.select('lunch_cards', CE.lunchSync.SELECT));
+      failed = false;
+      return true;
+    } catch (e) {
+      console.warn('[CRITIEAT] 開團單讀取失敗', e);
+      failed = true;
+      return false;
+    }
+  }
+
+  const ready = refresh;
+  const cards = () => cache.slice();
+
+  // 依序送出；任一筆失敗就 throw，後面的不送
+  async function apply(ops) {
+    for (const op of ops) {
+      if (op.kind === 'insert') await CE.supa.insert(op.table, op.row);
+      else if (op.kind === 'update') await CE.supa.update(op.table, { col: 'id', val: op.match.id }, op.patch);
+      else if (op.kind === 'delete') await CE.supa.del(op.table, op.match);
+    }
+  }
+
   // 只讀不寫：給美食地圖的轉盤看最近的午餐卡。讀不到或格式不對回傳 []，不會寫入示範資料
   function peekCards() {
+    if (live()) return cards();
     const raw = read(KEY);
     if (!raw) return [];
     try {
@@ -41,6 +72,7 @@
 
   // 只讀不寫：給美食地圖的評分選身分。讀不到或格式不對時回傳示範成員，不會寫入示範資料
   function peekMembers() {
+    if (live()) return CE.memberRepo.list();
     const raw = read(KEY);
     if (raw) {
       try {
@@ -57,13 +89,15 @@
     return db;
   }
 
+  // 正式版只認同事名單上的名字
   function getMe() {
-    return read(ME_KEY) || '';
+    const me = read(ME_KEY) || '';
+    return !live() || CE.memberRepo.list().includes(me) ? me : '';
   }
 
   function setMe(name) {
     try { localStorage.setItem(ME_KEY, name); } catch (e) { /* 存不了就只在這次有效 */ }
   }
 
-  CE.lunchStore = { load, save, reset, getMe, setMe, peekCards, peekMembers };
+  CE.lunchStore = { load, save, reset, getMe, setMe, peekCards, peekMembers, ready, refresh, cards, apply, loadFailed: () => failed };
 })(globalThis.CE = globalThis.CE || {});
