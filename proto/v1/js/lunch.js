@@ -286,7 +286,7 @@
   function summaryText(card) {
     const s = summary(card);
     const [, m, d] = card.date.split('-').map(Number);
-    const out = [`${card.storeName} ${m}/${d} 取餐 ${card.pickupAt}`];
+    const out = [`${card.storeName} ${m}/${d}`];
     s.lines.forEach(l => out.push(`${l.name}${l.note ? `（${l.note}）` : ' '}×${l.qty}`));
     let last = `共 ${s.count} 項`;
     if (s.missing === 0 && s.count > 0) last += `　$${s.known}`;

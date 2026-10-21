@@ -290,12 +290,6 @@
     return { prev: days[i + 1] || null, next: i > 0 ? days[i - 1] : null };
   }
 
-  function countdownText(card) {
-    const c = L.countdown(card, now());
-    if (c.overdue) return '已超過收單時間';
-    return c.minutes === 0 ? '收單時間到了' : `剩 ${c.minutes} 分鐘`;
-  }
-
   // ── 頁首 ──
   function renderHeader() {
     $('today-label').textContent = `TODAY · ${dayLabel(state.day)}`;
@@ -333,7 +327,7 @@
       if (c.id === state.selectedId) item.classList.add('is-selected');
       const meta = c.status === 'proposed'
         ? `${c.proposer} 提議`
-        : `${c.owner} 開單 · ${c.closeAt} ${c.status === 'closed' ? '已收單' : '收單'}`;
+        : `${c.owner} 開單`; // 收單、取餐時間不固定，不顯示（2026-10-21）
       const count = c.status === 'proposed'
         ? `+${c.voters.length - 1}`
         : `${L.totals(c).people} 人`;
@@ -375,9 +369,7 @@
     if (card.status === 'proposed') {
       sub.append(el('span', null, `${card.proposer} 提議 · ${clock(card.createdAt)}`));
     } else {
-      sub.append(el('span', null, `${card.owner} 開單`), el('span', 'mono', `${card.closeAt} ${card.status === 'closed' ? '已收單' : '收單'}`));
-      if (card.status === 'ordering') sub.append(el('span', 'lcard__count', countdownText(card)));
-      sub.append(el('span', null, `預計 ${card.pickupAt} 取餐`));
+      sub.append(el('span', null, `${card.owner} 開單`));
     }
     box.append(sub);
     if (card.note) box.append(el('p', 'lcard__note', `「${card.note}」`));
@@ -489,7 +481,6 @@
     if (can.close) {
       const btns = el('div', 'btns btns--top');
       btns.append(
-        button('btn', '延後收單 +10 分鐘', () => act(cs => L.postpone(cs, card.id, state.me, 10))),
         button('btn btn--primary', '現在收單', () => act(cs => L.close(cs, card.id, state.me, now())))
       );
       box.append(el('div', 'sect', '開單的人才看得到'), btns);
@@ -666,7 +657,7 @@
     box.append(
       el('span', 'detail__kicker', '訂餐彙總'),
       el('h3', 'detail__name', card.storeName),
-      el('div', 'detail__sub', `取餐 ${card.pickupAt} · 付錢者 ${card.payer || '—'}`)
+      el('div', 'detail__sub', `付錢者 ${card.payer || '—'}`)
     );
     if (card.changedAfterClose) box.append(el('p', 'lside__warn', '收單後有修改，訂餐前請再確認'));
     if (s.count === 0) {
@@ -835,13 +826,9 @@
     renderSide();
   }
 
-  // 每 30 秒更新收單倒數（只改文字，不重畫，避免打斷正在輸入的欄位）
+  // 每 30 秒檢查是否換日（分頁開著過夜）
   function tick() {
-    if (refreshDay()) { render(); return; }
-    if (isPast()) return;
-    const card = selected();
-    const span = document.querySelector('.lcard__count');
-    if (card && span && card.status === 'ordering') span.textContent = countdownText(card);
+    if (refreshDay()) render();
   }
 
   async function init() {
