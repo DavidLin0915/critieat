@@ -78,7 +78,7 @@
       item.dataset.id = v.id;
       if (v.status === 'closed') item.classList.add('is-closed');
       if (v.id === state.selectedId) item.classList.add('is-selected');
-      const rating = CE.isDemo() && CE.ratingUi.summary(v.id); // 評分第二階段才上正式版
+      const rating = CE.ratingUi.summary(v.id);
       const meta = [
         v.category, CE.formatDistance(v.distance), v.todayHours || '營業時間未填',
         rating && `★ ${CE.rating.formatStars(rating.avg)} (${rating.count})`,
@@ -142,7 +142,7 @@
       week
     );
     if (v.note) box.append(el('p', 'detail__note', v.note));
-    if (CE.isDemo()) box.append(CE.ratingUi.section(v, onRatingChange));
+    box.append(CE.ratingUi.section(v, onRatingChange));
 
     const btns = el('div', 'btns');
     const editBtn = el('button', 'btn detail__edit', '✏️ 編輯');
@@ -224,10 +224,10 @@
   function openPicker() {
     CE.openPicker({
       stores: visible(),
-      cards: CE.isDemo() ? CE.lunchStore.peekCards() : [], // 正式版沒有共用的開團紀錄，不排除最近吃過
+      cards: CE.lunchStore.peekCards(),
       days: state.settings.pickerDays,
       today: CE.lunch.todayStr(new Date()),
-      source: CE.isDemo() ? 'map' : 'maplive',
+      source: 'map',
       onPick(store, action) {
         if (action === 'map') { select(store.id, 'map'); return; }
         location.href = CE.demoHref(`lunch.html?new=${encodeURIComponent(store.id)}&as=${action}`);
@@ -251,17 +251,20 @@
     state.dayKey = CE.todayKey(new Date(), override);
     state.dayOverridden = state.dayKey === override;
     state.settings = CE.rowsToSettings(CE.parseCsv(CE.DEMO_SETTINGS_CSV));
-    if (CE.isDemo()) CE.ratingUi.init(new Date());
 
     document.getElementById('hide-closed').addEventListener('change', onToggleHideClosed);
     document.getElementById('pick-btn').addEventListener('click', openPicker);
     renderHeader();
 
-    // 正式版先從 Supabase 載入店家、同事名單與菜單；地圖同時開始載入
+    // 正式版先從 Supabase 載入店家、同事名單、菜單、開團單（轉盤排除最近吃過）與評分；地圖同時開始載入
     state.loading = true;
     renderList();
     const mapReady = CE.loadMap(CE.CONFIG.googleMapsKey, document.getElementById('map'), id => select(id, 'map'));
-    await Promise.all([CE.storeRepo.ready(), CE.memberRepo.ready(), CE.menuData.ready()]);
+    await Promise.all([
+      CE.storeRepo.ready(), CE.memberRepo.ready(), CE.menuData.ready(),
+      CE.lunchStore.ready(), CE.ratingStore.ready(), CE.itemRatingStore.ready(),
+    ]);
+    CE.ratingUi.init(new Date());
     state.loading = false;
     state.all = CE.buildViewModel(CE.storeRepo.visible(), state.settings, state.dayKey);
 

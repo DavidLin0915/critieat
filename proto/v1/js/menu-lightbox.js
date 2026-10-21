@@ -114,12 +114,6 @@
         tr.dataset.item = it.id;
         const name = el('td', 'mitems__name', it.name);
         if (it.note) name.append(el('span', 'mitems__note', it.note));
-        // 品項評分第二階段才上正式版：只有品名與價格，列不能點開
-        if (!CE.isDemo()) {
-          tr.append(name, el('td', 'mitems__price mono', price(it.price)));
-          table.append(tr);
-          return;
-        }
         tr.tabIndex = 0;
         tr.setAttribute('aria-expanded', String(open));
         const mine = IR.mineLabel(it.id);
@@ -259,7 +253,6 @@
       const sameName = name => menu.sections.reduce((n, s) => n + s.items.filter(x => x.name === name).length, 0) > 1;
 
       function paintTop() {
-        if (!CE.isDemo()) { top.hidden = true; return; }
         const list = CE.itemRatingUi.top(store.id);
         top.replaceChildren();
         top.hidden = tab !== 'table' || list.length === 0;

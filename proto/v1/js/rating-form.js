@@ -3,12 +3,13 @@
 
   // 共用的評分表單（店家評分、品項評分）：選身分、半星、短評、儲存／更新、刪除（兩段確認）、其他人的評分。
   // const f = CE.ratingForm({ kit, store, field })
-  //   kit：CE.rating 或 CE.itemRating；store：{ load(now), save(db) }；field：評分對象欄位（'storeId' / 'itemId'）
+  //   kit：CE.rating 或 CE.itemRating；store：{ load(now), save(db, change) → Promise<boolean> }；field：評分對象欄位（'storeId' / 'itemId'）
   // f.panel(target, onChange, opts)：target = { id, extra }，extra 是存檔時一併寫入的欄位（品項評分的 storeId、itemName、itemNote）
   //   儲存或刪除成功後呼叫 onChange（由頁面重畫）；opts.hideSwitch：不顯示「切換」（開團單的身分由頁面右上角管理）
   // 身分與成員名單共用開團單（lunch-store.js），每次畫面重建時重新讀，所以兩頁換身分會同步。
   // 還沒存的星數與短評、正在換身分、刪除確認都留在表單物件裡，畫面因為其他原因重畫時不會不見。
   const SAVE_FAILED = '無法儲存到這台電腦的瀏覽器';
+  const SAVE_FAILED_LIVE = '儲存失敗，請檢查網路後再試一次';
 
   // 所有使用者資料一律用 textContent 寫入，不用 innerHTML
   function el(tag, cls, text) {
@@ -34,6 +35,7 @@
       switching: false,     // 正在換身分
       confirmDelete: false,
       error: null,
+      saving: false,        // 正式版存檔中：按鈕停用
     };
 
     function init(now) {
@@ -72,9 +74,13 @@
       state.error = null;
     }
 
-    // 存得進去才更新資料與畫面；存不進去就留著表單內容並顯示錯誤
-    function commitDb(db, rebuild, onChange) {
-      if (!store.save(db)) { state.error = SAVE_FAILED; rebuild(); return; }
+    // 存得進去才更新資料與畫面；存不進去就留著表單內容並顯示錯誤。change 給正式版只寫這次的變動
+    async function commitDb(db, change, rebuild, onChange) {
+      if (state.saving) return;
+      state.saving = true; // 存檔中：送出、刪除按鈕由 form() 先停用
+      const ok = await store.save(db, change);
+      state.saving = false;
+      if (!ok) { state.error = CE.isDemo() ? SAVE_FAILED : SAVE_FAILED_LIVE; rebuild(); return; }
       state.db = db;
       state.warning = null;
       state.error = null;
@@ -116,10 +122,12 @@
 
       function save() {
         if (d.stars == null) return;
-        commitDb(kit.upsert(state.db, Object.assign({}, target.extra, {
+        const rating = Object.assign({}, target.extra, {
           [field]: target.id, member: me, stars: d.stars,
           comment: kit.normalizeComment(d.comment), updatedAt: new Date().toISOString(),
-        })), rebuild, onChange);
+        });
+        submit.disabled = true;
+        commitDb(kit.upsert(state.db, rating), { type: 'upsert', rating }, rebuild, onChange);
       }
 
       const submit = button('btn btn--primary', old ? '更新' : '儲存', save);
@@ -151,7 +159,8 @@
           state.confirmDelete ? '確定刪除？' : '刪除我的評分',
           () => {
             if (!state.confirmDelete) { state.confirmDelete = true; rebuild(); return; }
-            commitDb(kit.remove(state.db, target.id, me), rebuild, onChange);
+            btns.lastChild.disabled = true;
+            commitDb(kit.remove(state.db, target.id, me), { type: 'remove', id: target.id, member: me }, rebuild, onChange);
           }
         ));
       }
