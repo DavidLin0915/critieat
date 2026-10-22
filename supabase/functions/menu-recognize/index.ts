@@ -1,6 +1,6 @@
 // CRITIEAT 菜單 AI 辨識：照片 → Gemini → 草稿列。部署方式見 supabase/README.md ⑧。
 // 這個檔案刻意不用 TypeScript 語法、不 import 任何東西：可以整份貼進 Supabase Dashboard 的函式編輯器，也能用 node 檢查。
-// 環境變數：GEMINI_API_KEY（必填，Supabase secrets）、GEMINI_MODEL（選填）；SUPABASE_URL、SUPABASE_ANON_KEY 由 Supabase 自動提供。
+// 環境變數：GEMINI_API_KEY（必填，Supabase secrets）、GEMINI_MODEL（選填）；SUPABASE_URL、SUPABASE_PUBLISHABLE_KEYS（舊版 SUPABASE_ANON_KEY）由 Supabase 自動提供。
 // 請求：POST { images: [{ data: base64, mime } | { url }] }，header x-team-code＝團隊通關碼。
 // 回應：200 { rows: [{ category, name, price: number|null, note, uncertain }], failed: [索引] }；
 //       錯誤 { error: bad_request | too_many | no_images | passcode | quota | ai | not_configured }。
@@ -49,10 +49,19 @@ class AiError extends Error {
   constructor(code) { super(code); this.code = code; }
 }
 
+// 呼叫資料庫用的公開 key：新版是 JSON 字典取 default，舊專案退回 anon key
+function publicKey() {
+  try {
+    const keys = JSON.parse(Deno.env.get('SUPABASE_PUBLISHABLE_KEYS') || '{}');
+    if (keys && keys.default) return keys.default;
+  } catch (e) { /* 沒有或格式不對就用舊版 */ }
+  return Deno.env.get('SUPABASE_ANON_KEY');
+}
+
 async function codeOk(code) {
   if (!code) return false;
   const url = Deno.env.get('SUPABASE_URL');
-  const key = Deno.env.get('SUPABASE_ANON_KEY');
+  const key = publicKey();
   const res = await fetch(`${url}/rest/v1/rpc/check_team_code`, {
     method: 'POST',
     headers: { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
