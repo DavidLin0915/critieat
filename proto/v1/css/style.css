@@ -440,6 +440,7 @@ button.pill { font: inherit; font-size: 13px; font-weight: 600; }
 .mdraft__row.is-uncertain input { border-color: #fcd34d; }
 .mdraft__row.is-error input { border-color: #f87171; }
 .mdraft__add { margin: 8px 4px; }
+.mdraft__old { grid-column: 1 / -1; font-size: 12px; color: var(--faint); padding: 0 4px; }
 
 @keyframes nav-in { from { opacity: 0; } to { opacity: 1; } }
 

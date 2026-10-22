@@ -1,7 +1,8 @@
 (function (CE) {
   'use strict';
-  // 菜單燈箱：結構化表格 + 原始照片對照，以及「上傳 → AI 辨識 → 確認草稿 → 儲存」流程（原型：辨識是假的）。
-  // 正式版沒有 AI 辨識：「上傳照片 → 對照照片手動輸入品項 → 儲存」，照片上傳到 Supabase Storage。
+  // 菜單燈箱：結構化表格 + 原始照片對照，以及「上傳 → AI 辨識 → 確認草稿 → 儲存」流程。
+  // 正式版：照片交給 Edge Function（Gemini）辨識，結果併進舊菜單當草稿；也可以不辨識直接輸入。照片上傳到 Supabase Storage。
+  // 示範模式：辨識是假的（fakeRecognize）。
   // 資料：讀寫交給 menu-data.js（CE.menuData）。
   // 用法：CE.hasMenu(storeId)、CE.openMenu({ id, name, category })
   // 儲存或還原後在 document 發出 'ce:menu-change'，頁面可藉此更新按鈕文字。
@@ -12,6 +13,16 @@
   const STALE_DAYS = 60;
   const MAX_BYTES = 10 * 1024 * 1024;
   const FAKE_DELAY = 1500;
+  const MAX_AI_PHOTOS = 6;
+  const AI_TIMEOUT = 60000;
+  const AI_TIP = '請對照照片檢查。AI 沒把握的列標成黃色，價格讀不出來的留空；改過的列黃色就會消失。';
+  const FAIL_TEXT = {
+    quota: '免費辨識次數暫時用完了，可以過一陣子再試，或先直接輸入',
+    empty: '沒有辨識到菜單品項，可以直接輸入',
+    not_configured: '辨識功能還沒設定好，可以先直接輸入',
+    no_images: '照片都讀不到，請改用截圖上傳',
+    ai: '辨識失敗，可以重試或直接輸入',
+  };
 
   // 所有使用者資料一律用 textContent 寫入，不用 innerHTML
   function el(tag, cls, text) {
@@ -70,6 +81,27 @@
       img.onerror = () => resolve(null);
       img.src = src;
     });
+  }
+
+  function blobToBase64(blob) {
+    return new Promise(resolve => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result).replace(/^data:[^,]*,/, ''));
+      r.onerror = () => resolve(null);
+      r.readAsDataURL(blob);
+    });
+  }
+
+  function withTimeout(promise, ms) {
+    let timer;
+    const late = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('timeout')), ms); });
+    return Promise.race([promise, late]).finally(() => clearTimeout(timer));
+  }
+
+  // 辨識錯誤 → FAIL_TEXT 的鍵（函式沒部署時 Supabase 回 404）
+  function failCode(e) {
+    if (e && e.status === 404) return 'not_configured';
+    return e && FAIL_TEXT[e.code] && e.code !== 'empty' ? e.code : 'ai';
   }
 
   function getDialog() {
@@ -179,6 +211,8 @@
     let rows = [];          // 草稿列
     let rowErrors = [];
     let flash = '';         // 菜單畫面上方的一次性訊息
+    let recognized = false; // 草稿是 AI 辨識來的（決定提示文字）
+    let notice = '';        // 草稿上方的一次性提示（哪幾張照片讀不到）
 
     dlg.onclose = () => { token += 1; };
 
@@ -366,7 +400,7 @@
           img.alt = `照片 ${i + 1}`;
           img.addEventListener('error', () => {
             photos = photos.filter(x => x !== p);
-            showUpload('有一張網址抓不到圖片，已移除。請確認網址是直接指向圖片檔。');
+            showUpload(p.kind === 'url' ? '有一張網址抓不到圖片，已移除。請確認網址是直接指向圖片檔。' : '有一張照片讀不到，已移除。請改用 JPG 或 PNG 截圖。');
           });
           const del = button('mup__del', '×', () => { photos.splice(i, 1); showUpload(''); });
           del.setAttribute('aria-label', '移除這張');
@@ -378,20 +412,36 @@
 
       const btns = el('div', 'btns mdlg__foot');
       const n = photos.length ? `（${photos.length} 張）` : '';
-      // 正式版沒有照片也能直接輸入品項；重新上傳沒選新照片時保留原本的照片
-      const go = CE.isDemo() ? button('btn btn--primary', `開始辨識${n}`, showLoading) : button('btn btn--primary', `下一步：輸入品項${n}`, startDraft);
-      go.disabled = CE.isDemo() && photos.length === 0;
-      btns.append(button('btn', '取消', showMenu), go);
+      if (CE.isDemo()) {
+        const go = button('btn btn--primary', `開始辨識${n}`, showLoading);
+        go.disabled = photos.length === 0;
+        btns.append(button('btn', '取消', showMenu), go);
+      } else if (photos.length) {
+        const go = button('btn btn--primary', `開始辨識${n}`, showLoading);
+        go.disabled = photos.length > MAX_AI_PHOTOS;
+        if (go.disabled) body.append(el('p', 'editor__err', `一次最多辨識 ${MAX_AI_PHOTOS} 張照片`));
+        btns.append(button('btn', '取消', showMenu), button('btn', '不辨識，直接輸入', startDraft), go);
+      } else {
+        // 沒有照片也能直接輸入品項；重新上傳沒選新照片時保留原本的照片
+        btns.append(button('btn', '取消', showMenu), button('btn btn--primary', '直接輸入', startDraft));
+      }
       dlg.append(body, btns);
     }
 
-    // ── 3. 辨識中（假的） ──
+    // ── 3. 辨識中 ──
     function showLoading() {
       frame('辨識中');
       const box = el('div', 'mdlg__body mload');
-      box.append(el('div', 'mload__spin'), el('p', 'mload__text', 'AI 正在讀菜單…'),
-        el('p', 'hint', `原型示意：照片不會真的送出，${FAKE_DELAY / 1000} 秒後產生一份假的草稿。`));
+      box.append(el('div', 'mload__spin'), el('p', 'mload__text', 'AI 正在讀菜單…'));
       dlg.append(box);
+      if (!CE.isDemo()) {
+        const btns = el('div', 'btns mdlg__foot');
+        btns.append(button('btn', '取消', () => showUpload('')));
+        dlg.append(btns);
+        recognize(token);
+        return;
+      }
+      box.append(el('p', 'hint', `原型示意：照片不會真的送出，${FAKE_DELAY / 1000} 秒後產生一份假的草稿。`));
       const my = token;
       setTimeout(() => {
         if (my !== token || !dlg.open) return;
@@ -401,8 +451,58 @@
       }, FAKE_DELAY);
     }
 
+    // 正式版：照片整理好送去辨識，結果併進舊菜單。每次 await 後確認還在同一個畫面（取消、關閉會讓 token 變掉）
+    async function recognize(my) {
+      const here = () => my === token && dlg.open;
+      const images = [];
+      const from = [];    // images[j] 是第幾張照片
+      const unread = [];  // 讀不到的照片序號
+      for (let i = 0; i < photos.length; i++) {
+        const p = photos[i];
+        if (p.kind === 'url') { images.push({ url: p.src }); from.push(i); continue; }
+        const blob = await shrink(p.src, true);
+        const data = blob && await blobToBase64(blob);
+        if (!here()) return;
+        if (!data) { unread.push(i); continue; }
+        images.push({ data, mime: 'image/jpeg' });
+        from.push(i);
+      }
+      if (images.length === 0) { showFail('no_images'); return; }
+
+      let result;
+      try {
+        result = await withTimeout(MD.recognize(images), AI_TIMEOUT);
+      } catch (e) {
+        if (!here()) return;
+        if (e && e.code === 'passcode') showUpload('');
+        else showFail(failCode(e));
+        return;
+      }
+      if (!here()) return;
+      if (result.rows.length === 0) { showFail('empty'); return; }
+      result.failed.forEach(j => { if (from[j] != null) unread.push(from[j]); });
+
+      const old = MD.getMenu(store.id);
+      rows = D.mergeRecognized(old ? D.fromSections(old.sections) : [], result.rows);
+      rowErrors = [];
+      recognized = true;
+      notice = unread.length ? `第 ${unread.sort((a, b) => a - b).map(i => i + 1).join('、')} 張照片讀不到，沒有辨識` : '';
+      showDraft('');
+    }
+
+    function showFail(code) {
+      frame('辨識失敗');
+      const box = el('div', 'mdlg__body mload');
+      box.append(el('p', 'mload__text', FAIL_TEXT[code] || FAIL_TEXT.ai));
+      const btns = el('div', 'btns mdlg__foot');
+      btns.append(button('btn', '取消', () => showUpload('')), button('btn', '直接輸入', startDraft), button('btn btn--primary', '重試', showLoading));
+      dlg.append(box, btns);
+    }
+
     // 正式版：有舊菜單就從它開始改，沒有就一列空白
     function startDraft() {
+      recognized = false;
+      notice = '';
       const old = MD.getMenu(store.id);
       rows = old ? D.fromSections(old.sections) : [{ category: '', name: '', price: '', note: '', uncertain: false }];
       rowErrors = [];
@@ -411,9 +511,10 @@
 
     // ── 4. 確認草稿 ──
     function showDraft(error) {
-      if (CE.isDemo()) {
+      if (CE.isDemo() || recognized) {
         frame('確認辨識結果');
-        dlg.append(el('p', 'mdraft__tip', '請對照照片檢查。AI 沒把握的列標成黃色，價格讀不出來的留空；改過的列黃色就會消失。'));
+        dlg.append(el('p', 'mdraft__tip', AI_TIP));
+        if (notice) dlg.append(el('p', 'mdraft__tip', notice));
       } else {
         frame('輸入菜單');
         dlg.append(el('p', 'mdraft__tip', '對照照片輸入品項，價格看不清楚可以留空'));
@@ -449,7 +550,13 @@
           inp.setAttribute('aria-label', ph);
           inp.addEventListener('input', () => {
             r[key] = inp.value;
-            if (r.uncertain) { r.uncertain = false; row.classList.remove('is-uncertain'); }
+            if (r.uncertain || r.oldPrice) {
+              r.uncertain = false;
+              delete r.oldPrice;
+              row.classList.remove('is-uncertain');
+              const o = row.querySelector('.mdraft__old');
+              if (o) o.remove();
+            }
           });
           return inp;
         };
@@ -458,6 +565,7 @@
         const del = button('editor__del', '×', () => { rows.splice(i, 1); rowErrors = []; showDraft(''); });
         del.setAttribute('aria-label', '刪除這一列');
         row.append(field('category', '分類', 'mdraft__cat'), field('name', '品名', 'mdraft__name'), p, field('note', '備註', 'mdraft__note'), del);
+        if (r.oldPrice) row.append(el('span', 'mdraft__old', `原價 $${r.oldPrice}`));
         body.append(row);
         if (rowErrors[i]) body.append(el('div', 'editor__err', rowErrors[i]));
       });
