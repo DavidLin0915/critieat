@@ -5,10 +5,11 @@
 // 回應：200 { rows: [{ category, name, price: number|null, note, uncertain }], failed: [索引] }；
 //       錯誤 { error: bad_request | too_many | no_images | passcode | quota | ai | not_configured }。
 
-// 預設型號：2026-10-22 查 ai.google.dev，免費方案有額度的 Flash 穩定版
-const DEFAULT_MODEL = 'gemini-3.8-flash';
+// 預設型號：2026-10-22 查 ai.google.dev，免費方案、支援圖片的 Flash-Lite。
+// 實測 gemini-3.8-flash 想太久（超過 Supabase 函式時限、常 503），Flash-Lite 一份菜單約 8 秒且讀得準
+const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
 // 部署版本：回應 header x-menu-recognize-version，用來確認 Dashboard 上跑的是哪一版
-const VERSION = '2026-10-22.2';
+const VERSION = '2026-10-22.3';
 const MAX_IMAGES = 6;
 const MAX_URL_BYTES = 10 * 1024 * 1024;
 const URL_TIMEOUT_MS = 15000;
@@ -138,6 +139,15 @@ async function callAi(images, key, model) {
 }
 
 const str = v => (typeof v === 'string' ? v.trim() : '');
+const CJK = '\u3400-\u9fff\uf900-\ufaff';
+// 分類照抄時常帶裝飾：「~抄 手 類~」「～小 菜 類～ 45」→「抄手類」「小菜類」（中文字之間的空白、波浪號、結尾的共用價格去掉）
+function cleanCategory(v) {
+  return str(v)
+    .replace(/[~～]/g, '')
+    .replace(new RegExp(`(?<=[${CJK}])\\s+(?=[${CJK}])`, 'g'), '')
+    .replace(/\s*\$?\d+(\.\d+)?\s*元?$/, '')
+    .trim();
+}
 
 function clean(raw) {
   const rows = [];
@@ -151,7 +161,7 @@ function clean(raw) {
       if (typeof price === 'number' && Number.isFinite(price) && price >= 0) price = Math.round(price * 10) / 10;
       else { price = null; uncertain = true; }
     }
-    rows.push({ category: str(r.category), name, price, note: str(r.note), uncertain });
+    rows.push({ category: cleanCategory(r.category), name, price, note: str(r.note), uncertain });
   });
   return rows;
 }
