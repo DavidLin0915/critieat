@@ -146,6 +146,13 @@
     }
   }
 
+  // 正式版：照片 [{ data, mime } | { url }] 交給 Edge Function 辨識；回傳 { rows, failed }，失敗 throw CE.SupaError
+  async function recognize(images) {
+    if (!live()) throw new Error('示範模式不呼叫 AI 辨識');
+    const out = await CE.supa.invoke('menu-recognize', { images });
+    return { rows: (out && out.rows) || [], failed: (out && out.failed) || [] };
+  }
+
   function removeSaved(storeId) {
     const map = Object.assign({}, loadSaved());
     delete map[storeId];
@@ -212,7 +219,7 @@
   }
 
   CE.menuData = {
-    KEY, norm, itemKey, isSaved, getMenu, hasMenu, ready, loadFailed: () => menusFailed, saveMenu, uploadPhoto, removeSaved,
+    KEY, norm, itemKey, isSaved, getMenu, hasMenu, ready, loadFailed: () => menusFailed, saveMenu, uploadPhoto, recognize, removeSaved,
     assignIds, ensureIds, items, findItem, matchItem, search,
   };
 })(globalThis.CE = globalThis.CE || {});

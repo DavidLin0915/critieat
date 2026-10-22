@@ -132,6 +132,12 @@
       return `${base()}/storage/v1/object/public/${bucket}/${path}`;
     },
 
+    // Edge Function：帶通關碼（被擋時同寫入一樣問一次再重送）；失敗 throw SupaError，code＝回應的 error
+    invoke(fn, body) {
+      return write(() => request(`${base()}/functions/v1/${fn}`,
+        { method: 'POST', headers: headers(withCode({ 'Content-Type': 'application/json' })), body: JSON.stringify(body) }));
+    },
+
     rpc(fn, args) {
       return request(rest('rpc/' + fn), { method: 'POST', headers: headers({ 'Content-Type': 'application/json' }), body: JSON.stringify(args || {}) });
     },
