@@ -7,6 +7,8 @@
 
 // 預設型號：2026-10-22 查 ai.google.dev，免費方案有額度的 Flash 穩定版
 const DEFAULT_MODEL = 'gemini-3.8-flash';
+// 部署版本：回應 header x-menu-recognize-version，用來確認 Dashboard 上跑的是哪一版
+const VERSION = '2026-10-22.2';
 const MAX_IMAGES = 6;
 const MAX_URL_BYTES = 10 * 1024 * 1024;
 const URL_TIMEOUT_MS = 15000;
@@ -18,6 +20,8 @@ const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'apikey, authorization, content-type, x-team-code',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Expose-Headers': 'x-menu-recognize-version',
+  'x-menu-recognize-version': VERSION,
 };
 
 const PROMPT = `你會看到同一家店的菜單照片（可能是手機拍的紙本菜單，或 Google Maps 的截圖）。請把照片上的品項整理成 JSON 陣列，每一項是 { category, name, price, note, uncertain }。
@@ -48,8 +52,9 @@ function reply(status, body) {
   return new Response(JSON.stringify(body), { status, headers: Object.assign({ 'Content-Type': 'application/json' }, CORS) });
 }
 
+// code 給前端分辨畫面；reason 是失敗在哪一步（不含 key 或 Gemini 的訊息內容），方便查問題
 class AiError extends Error {
-  constructor(code) { super(code); this.code = code; }
+  constructor(code, reason) { super(code); this.code = code; this.reason = reason; }
 }
 
 // 呼叫資料庫用的公開 key：新版是 JSON 字典取 default，舊專案退回 anon key
@@ -111,13 +116,14 @@ async function callAi(images, key, model) {
       }),
     });
   } catch (e) {
-    throw new AiError('ai');
+    console.error(`Gemini 連不上 (${model}): ${e && e.message}`);
+    throw new AiError('ai', 'gemini_fetch_failed');
   }
   if (!res.ok) {
     // 只寫進函式 log（Dashboard → Edge Functions → menu-recognize → Logs），不回給前端；key 先遮掉
     const detail = (await res.text().catch(() => '')).split(key).join('***').slice(0, 500);
     console.error(`Gemini ${res.status} (${model}): ${detail}`);
-    throw new AiError(res.status === 429 ? 'quota' : 'ai');
+    throw new AiError(res.status === 429 ? 'quota' : 'ai', 'gemini_' + res.status);
   }
   try {
     const out = await res.json();
@@ -127,7 +133,7 @@ async function callAi(images, key, model) {
     return rows;
   } catch (e) {
     console.error(`Gemini 回應無法解析 (${model}): ${e && e.message}`);
-    throw new AiError('ai');
+    throw new AiError('ai', 'gemini_bad_response');
   }
 }
 
@@ -156,7 +162,8 @@ async function handle(req) {
   try {
     if (!(await codeOk(req.headers.get('x-team-code')))) return reply(403, { error: 'passcode' });
   } catch (e) {
-    return reply(502, { error: 'ai' });
+    console.error(`通關碼檢查失敗: ${e && e.message}`);
+    return reply(502, { error: 'ai', reason: 'passcode_check_failed' });
   }
 
   const key = Deno.env.get('GEMINI_API_KEY');
@@ -186,7 +193,9 @@ async function handle(req) {
     const rows = clean(await callAi(images, key, Deno.env.get('GEMINI_MODEL') || DEFAULT_MODEL));
     return reply(200, { rows, failed });
   } catch (e) {
-    return reply(e instanceof AiError && e.code === 'quota' ? 429 : 502, { error: e instanceof AiError ? e.code : 'ai' });
+    if (!(e instanceof AiError)) console.error(`辨識失敗: ${e && e.message}`);
+    const err = e instanceof AiError ? e : new AiError('ai', 'unexpected');
+    return reply(err.code === 'quota' ? 429 : 502, { error: err.code, reason: err.reason });
   }
 }
 
