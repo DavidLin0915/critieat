@@ -62,5 +62,32 @@
     return rows;
   }
 
-  CE.menuDraft = { parsePrice, isBlank, validate, toSections, fromSections, fakeRecognize };
+  // AI 辨識結果併進舊草稿（不改動傳入的陣列）。aiRows：[{ category, name, price: number|null, note, uncertain }]
+  // 舊列全部保留、順序不變；「品名＋備註」比對到的只在價格不同時改價並標黃（附 oldPrice 給畫面顯示原價），
+  // AI 自己沒把握的價格不蓋掉舊價格；比對不到的加在最後。同一次辨識重複的品項只留第一筆。
+  function mergeRecognized(oldRows, aiRows) {
+    const key = r => CE.menuData.itemKey(r.name, r.note);
+    const out = oldRows.map(r => Object.assign({}, r));
+    const seen = new Set();
+    aiRows.forEach(a => {
+      const k = key(a);
+      if (seen.has(k)) return;
+      seen.add(k);
+      const price = a.price == null ? '' : String(a.price);
+      const i = oldRows.findIndex(r => key(r) === k);
+      if (i < 0) {
+        out.push({ category: a.category || '', name: a.name, price, note: a.note || '', uncertain: !!a.uncertain });
+        return;
+      }
+      const r = out[i];
+      const old = parsePrice(r.price);
+      if (a.price == null || old === a.price) return;
+      if (old == null) Object.assign(r, { price, uncertain: true });
+      else if (a.uncertain) r.uncertain = true;
+      else Object.assign(r, { price, uncertain: true, oldPrice: String(r.price).trim() });
+    });
+    return out;
+  }
+
+  CE.menuDraft = { parsePrice, isBlank, validate, toSections, fromSections, fakeRecognize, mergeRecognized };
 })(globalThis.CE = globalThis.CE || {});
