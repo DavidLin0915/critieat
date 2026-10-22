@@ -78,7 +78,8 @@
       if (!code) throw new SupaError(403, 'passcode', '沒有通關碼');
       setCode(code);
     }
-    throw new SupaError(403, 'passcode', '通關碼被拒');
+    // 輸入框已確認碼正確、重送仍被擋：不是碼的問題（例如 Edge Function 設定不對）
+    throw new SupaError(403, 'passcode_rejected', '通關碼被拒');
   }
 
   CE.SupaError = SupaError;

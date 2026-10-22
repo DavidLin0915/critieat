@@ -10,6 +10,9 @@ const DEFAULT_MODEL = 'gemini-3.8-flash';
 const MAX_IMAGES = 6;
 const MAX_URL_BYTES = 10 * 1024 * 1024;
 const URL_TIMEOUT_MS = 15000;
+// Gemini 收的圖片格式；一次請求的圖片總量上限（base64 後要低於 Gemini 的 20MB）
+const TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/heic', 'image/heif'];
+const MAX_TOTAL_BYTES = 14 * 1024 * 1024;
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -83,7 +86,7 @@ async function fetchImage(url) {
   try {
     const res = await fetch(url, { signal: ctl.signal });
     const type = (res.headers.get('content-type') || '').split(';')[0].trim();
-    if (!res.ok || !type.startsWith('image/')) return null;
+    if (!res.ok || !TYPES.includes(type)) return null;
     if (Number(res.headers.get('content-length') || 0) > MAX_URL_BYTES) return null;
     const bytes = new Uint8Array(await res.arrayBuffer());
     if (bytes.length > MAX_URL_BYTES) return null;
@@ -132,7 +135,7 @@ function clean(raw) {
     const name = str(r.name);
     if (!name) return;
     let price = r.price == null ? null : r.price;
-    let uncertain = r.uncertain === true;
+    let uncertain = r.uncertain === true || price == null;
     if (price != null) {
       if (typeof price === 'number' && Number.isFinite(price) && price >= 0) price = Math.round(price * 10) / 10;
       else { price = null; uncertain = true; }
@@ -163,11 +166,15 @@ async function handle(req) {
   const failed = [];
   const images = [];
   const got = await Promise.all(list.map(im => {
-    if (im && typeof im.data === 'string' && im.data && typeof im.mime === 'string' && im.mime.startsWith('image/')) return { data: im.data, mime: im.mime };
+    if (im && typeof im.data === 'string' && im.data && TYPES.includes(im.mime)) return { data: im.data, mime: im.mime };
     if (im && typeof im.url === 'string' && /^https?:\/\//i.test(im.url)) return fetchImage(im.url);
     return null;
   }));
-  got.forEach((im, i) => { if (im) images.push(im); else failed.push(i); });
+  let total = 0;
+  got.forEach((im, i) => {
+    const size = im ? im.data.length * 3 / 4 : 0;
+    if (im && total + size <= MAX_TOTAL_BYTES) { images.push(im); total += size; } else failed.push(i);
+  });
   if (images.length === 0) return reply(400, { error: 'no_images' });
 
   try {

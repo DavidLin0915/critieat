@@ -98,9 +98,9 @@
     return Promise.race([promise, late]).finally(() => clearTimeout(timer));
   }
 
-  // 辨識錯誤 → FAIL_TEXT 的鍵（函式沒部署時 Supabase 回 404）
+  // 辨識錯誤 → FAIL_TEXT 的鍵（函式沒部署時 Supabase 回 404；碼正確仍被擋多半是函式的 Verify JWT 沒關）
   function failCode(e) {
-    if (e && e.status === 404) return 'not_configured';
+    if (e && (e.status === 404 || e.code === 'passcode_rejected')) return 'not_configured';
     return e && FAIL_TEXT[e.code] && e.code !== 'empty' ? e.code : 'ai';
   }
 
@@ -366,6 +366,7 @@
 
     function showUpload(error) {
       frame('上傳菜單');
+      const my = token; // 縮圖晚到的錯誤：離開這個畫面後只移除照片，不重畫（不然會把辨識中或草稿畫面換掉）
       const body = el('div', 'mdlg__body mup');
       body.append(el('p', 'hint', '可以一次選多張（多頁菜單）。照片會跟整理好的表格一起保存，之後可以切換對照。'));
 
@@ -400,7 +401,7 @@
           img.alt = `照片 ${i + 1}`;
           img.addEventListener('error', () => {
             photos = photos.filter(x => x !== p);
-            showUpload(p.kind === 'url' ? '有一張網址抓不到圖片，已移除。請確認網址是直接指向圖片檔。' : '有一張照片讀不到，已移除。請改用 JPG 或 PNG 截圖。');
+            if (my === token) showUpload(p.kind === 'url' ? '有一張網址抓不到圖片，已移除。請確認網址是直接指向圖片檔。' : '有一張照片讀不到，已移除。請改用 JPG 或 PNG 截圖。');
           });
           const del = button('mup__del', '×', () => { photos.splice(i, 1); showUpload(''); });
           del.setAttribute('aria-label', '移除這張');
