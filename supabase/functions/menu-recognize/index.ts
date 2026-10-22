@@ -113,8 +113,12 @@ async function callAi(images, key, model) {
   } catch (e) {
     throw new AiError('ai');
   }
-  if (res.status === 429) throw new AiError('quota');
-  if (!res.ok) throw new AiError('ai');
+  if (!res.ok) {
+    // 只寫進函式 log（Dashboard → Edge Functions → menu-recognize → Logs），不回給前端；key 先遮掉
+    const detail = (await res.text().catch(() => '')).split(key).join('***').slice(0, 500);
+    console.error(`Gemini ${res.status} (${model}): ${detail}`);
+    throw new AiError(res.status === 429 ? 'quota' : 'ai');
+  }
   try {
     const out = await res.json();
     const text = out.candidates[0].content.parts.map(p => p.text || '').join('');
@@ -122,6 +126,7 @@ async function callAi(images, key, model) {
     if (!Array.isArray(rows)) throw new Error('not array');
     return rows;
   } catch (e) {
+    console.error(`Gemini 回應無法解析 (${model}): ${e && e.message}`);
     throw new AiError('ai');
   }
 }
